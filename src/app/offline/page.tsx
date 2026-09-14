@@ -2,7 +2,7 @@
 
 export default function OfflinePage() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-bg px-4 text-center">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-bg px-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] text-center">
       <p className="text-text">Sie sind offline. Ihre lokalen Daten sind weiterhin verfügbar.</p>
       <button
         onClick={() => window.location.reload()}

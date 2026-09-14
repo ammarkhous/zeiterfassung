@@ -95,7 +95,7 @@ export default function SessionsPage() {
     <div>
       <h1 className="mb-4 text-xl font-semibold text-text">Sessions</h1>
 
-      <div className="sticky top-0 z-10 mb-4 flex flex-wrap gap-3 bg-bg py-2">
+      <div className="sticky top-0 z-10 mb-4 flex flex-wrap gap-3 bg-bg py-2 pt-[calc(0.5rem+env(safe-area-inset-top))]">
         <Select
           value={customerFilter}
           onChange={(e) => {

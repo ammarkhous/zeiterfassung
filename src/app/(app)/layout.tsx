@@ -46,10 +46,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     <ToastProvider>
       <div className="min-h-screen bg-bg">
         <Sidebar syncStatus={syncStatus} />
-        <div className="flex items-center justify-end border-b border-border px-4 py-2 md:hidden">
+        <div className="flex items-center justify-end border-b border-border px-4 py-2 pt-[calc(0.5rem+env(safe-area-inset-top))] md:hidden">
           <SyncStatus status={syncStatus} />
         </div>
-        <main className="pb-20 md:ml-60 md:pb-0">
+        <main className="pb-[calc(5rem+env(safe-area-inset-bottom))] md:ml-60 md:pb-0">
           <div className="mx-auto max-w-5xl px-4 py-6">{children}</div>
         </main>
         <BottomNav />

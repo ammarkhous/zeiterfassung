@@ -48,7 +48,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       <h1 className="mb-6 text-2xl font-semibold text-text">Zeiterfassung</h1>
       <form
         onSubmit={handleSubmit}
