@@ -1,0 +1,108 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { getDB } from '@/lib/db';
+import { TimerState } from '@/types';
+import { useTimeEntries } from './useTimeEntries';
+
+const localDateString = (d: Date): string => {
+  const y = d.getFullYear();
+  const m = (d.getMonth() + 1).toString().padStart(2, '0');
+  const day = d.getDate().toString().padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+export const useTimer = () => {
+  const [timerState, setTimerState] = useState<TimerState | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [frozenMinutes, setFrozenMinutes] = useState<number | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { addEntry } = useTimeEntries();
+
+  useEffect(() => {
+    const load = async () => {
+      const db = await getDB();
+      const state = await db.get('timer_state', 'active');
+      if (state) {
+        setTimerState(state);
+      }
+    };
+    load();
+  }, []);
+
+  useEffect(() => {
+    if (timerState) {
+      const tick = () => {
+        const started = new Date(timerState.started_at).getTime();
+        const now = Date.now();
+        setElapsedSeconds(Math.floor((now - started) / 1000));
+      };
+      tick();
+      intervalRef.current = setInterval(tick, 1000);
+      return () => {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+      };
+    }
+  }, [timerState]);
+
+  const startTimer = useCallback(async (customer_id: string, session_type_id: string) => {
+    const db = await getDB();
+    const state: TimerState = {
+      key: 'active',
+      customer_id,
+      session_type_id,
+      started_at: new Date().toISOString(),
+    };
+    await db.put('timer_state', state);
+    setTimerState(state);
+    setFrozenMinutes(null);
+  }, []);
+
+  const stopTimer = useCallback((): number => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    const duration = Math.max(1, Math.round(elapsedSeconds / 60));
+    setFrozenMinutes(duration);
+    return duration;
+  }, [elapsedSeconds]);
+
+  const saveSession = useCallback(
+    async (duration_minutes: number, notes: string) => {
+      if (!timerState) return;
+      const db = await getDB();
+      await addEntry({
+        customer_id: timerState.customer_id,
+        session_type_id: timerState.session_type_id,
+        duration_minutes,
+        notes: notes || null,
+        entry_date: localDateString(new Date()),
+        started_at: timerState.started_at,
+        ended_at: new Date().toISOString(),
+      });
+      await db.delete('timer_state', 'active');
+      setTimerState(null);
+      setFrozenMinutes(null);
+      setElapsedSeconds(0);
+    },
+    [timerState, addEntry]
+  );
+
+  const discardSession = useCallback(async () => {
+    const db = await getDB();
+    await db.delete('timer_state', 'active');
+    setTimerState(null);
+    setFrozenMinutes(null);
+    setElapsedSeconds(0);
+  }, []);
+
+  return {
+    timerState,
+    isRunning: !!timerState && frozenMinutes === null,
+    isStopped: !!timerState && frozenMinutes !== null,
+    elapsedSeconds,
+    frozenMinutes,
+    startTimer,
+    stopTimer,
+    saveSession,
+    discardSession,
+  };
+};
