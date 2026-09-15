@@ -32,7 +32,7 @@ export const DatePicker = ({ value, onChange }: DatePickerProps) => {
   };
 
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="flex flex-wrap gap-2">
       <Select
         value={clampedDay}
         onChange={(e) => onChange(build(year, monthIndex, Number(e.target.value)))}
