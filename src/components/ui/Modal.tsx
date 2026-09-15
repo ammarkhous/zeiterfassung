@@ -24,11 +24,11 @@ export const Modal = ({ open, onClose, title, children }: ModalProps) => {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/60 p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-md border border-border bg-surface p-4"
+        className="mx-auto w-full max-w-lg rounded-md border border-border bg-surface p-4"
         onClick={(e) => e.stopPropagation()}
       >
         {title && <h2 className="mb-3 text-base font-semibold text-text">{title}</h2>}
