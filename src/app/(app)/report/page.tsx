@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useSessionTypes } from '@/hooks/useSessionTypes';
 import { useTimeEntries } from '@/hooks/useTimeEntries';
-import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { MonthYearPicker } from '@/components/ui/MonthYearPicker';
 import { ReportTable } from '@/components/report/ReportTable';
 import { ExportButtons } from '@/components/report/ExportButtons';
 import { minutesToAE } from '@/lib/ae';
@@ -66,12 +66,10 @@ export default function ReportPage() {
       <h1 className="mb-4 text-xl font-semibold text-text">Monatsreport</h1>
 
       <div className="mb-6 flex flex-wrap items-end gap-3">
-        <Input
-          label="Monat"
-          type="month"
-          value={monthValue}
-          onChange={(e) => setMonthValue(e.target.value)}
-        />
+        <div>
+          <label className="mb-1 block text-sm text-text-muted">Monat</label>
+          <MonthYearPicker value={monthValue} onChange={setMonthValue} />
+        </div>
         <Button onClick={handleGenerate}>Bericht erstellen</Button>
       </div>
 

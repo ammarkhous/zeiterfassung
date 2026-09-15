@@ -9,6 +9,7 @@ import { Select } from '@/components/ui/Select';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { MonthYearPicker } from '@/components/ui/MonthYearPicker';
 import { AEInput } from '@/components/entry/AEInput';
 import { minutesToAE, minutesToHHMM, formatAE } from '@/lib/ae';
 import { translateToGerman } from '@/lib/translate';
@@ -125,11 +126,10 @@ export default function SessionsPage() {
             </option>
           ))}
         </Select>
-        <Input
-          type="month"
+        <MonthYearPicker
           value={monthFilter}
-          onChange={(e) => {
-            setMonthFilter(e.target.value);
+          onChange={(value) => {
+            setMonthFilter(value);
             setPage(1);
           }}
         />
