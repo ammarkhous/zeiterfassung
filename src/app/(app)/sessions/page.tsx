@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { AEInput } from '@/components/entry/AEInput';
 import { minutesToAE, minutesToHHMM, formatAE } from '@/lib/ae';
+import { translateToGerman } from '@/lib/translate';
 import { TimeEntry } from '@/types';
 
 const PAGE_SIZE = 50;
@@ -182,7 +183,18 @@ export default function SessionsPage() {
                       <AEInput minutes={editMinutes} onChange={setEditMinutes} />
                     </td>
                     <td className="px-3 py-2">
-                      <Input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
+                      <Input
+                        value={editNotes}
+                        onChange={(e) => setEditNotes(e.target.value)}
+                        onBlur={async () => {
+                          if (!editNotes.trim()) return;
+                          const translated = await translateToGerman(editNotes);
+                          if (translated) {
+                            setEditNotes(translated);
+                            showToast('Beschreibung automatisch ins Deutsche übersetzt', 'success');
+                          }
+                        }}
+                      />
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex gap-2">
@@ -200,8 +212,18 @@ export default function SessionsPage() {
                     <td className="whitespace-nowrap px-3 py-2 text-text">
                       {formatDateDDMMYYYY(entry.entry_date)}
                     </td>
-                    <td className="px-3 py-2 text-text">{customerName(entry.customer_id)}</td>
-                    <td className="px-3 py-2 text-text">{sessionTypeLabel(entry.session_type_id)}</td>
+                    <td
+                      className="max-w-[180px] truncate px-3 py-2 text-text"
+                      title={customerName(entry.customer_id)}
+                    >
+                      {customerName(entry.customer_id)}
+                    </td>
+                    <td
+                      className="max-w-[140px] truncate px-3 py-2 text-text"
+                      title={sessionTypeLabel(entry.session_type_id)}
+                    >
+                      {sessionTypeLabel(entry.session_type_id)}
+                    </td>
                     <td className="whitespace-nowrap px-3 py-2">
                       <div className="font-semibold text-text">
                         {minutesToAE(entry.duration_minutes).toFixed(1)} AE
@@ -211,7 +233,10 @@ export default function SessionsPage() {
                       </div>
                     </td>
                     <td
-                      className="max-w-[220px] cursor-pointer px-3 py-2 text-text-muted"
+                      className={[
+                        'max-w-[220px] cursor-pointer px-3 py-2 text-text-muted',
+                        expandedNotesId === entry.id ? '' : 'truncate',
+                      ].join(' ')}
                       onClick={() =>
                         setExpandedNotesId(expandedNotesId === entry.id ? null : entry.id)
                       }

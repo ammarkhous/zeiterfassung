@@ -16,38 +16,54 @@ const notifyDataChanged = (): void => {
   }
 };
 
+const reconcileTable = async <T extends { id: string }>(
+  table: TableName,
+  remoteRows: T[],
+  pendingIds: Set<string>
+): Promise<void> => {
+  const db = await getDB();
+  const tx = db.transaction(table, 'readwrite');
+  const remoteIds = new Set(remoteRows.map((r) => r.id));
+
+  for (const row of remoteRows) {
+    await tx.store.put(row as unknown as Customer & SessionType & TimeEntry);
+  }
+
+  const localRows = await tx.store.getAll();
+  for (const local of localRows as { id: string }[]) {
+    if (!remoteIds.has(local.id) && !pendingIds.has(local.id)) {
+      await tx.store.delete(local.id);
+    }
+  }
+
+  await tx.done;
+};
+
 export const pullFromSupabase = async (): Promise<void> => {
   const db = await getDB();
 
-  const [{ data: customers }, { data: sessionTypes }, { data: timeEntries }] =
+  const [{ data: customers }, { data: sessionTypes }, { data: timeEntries }, queueItems] =
     await Promise.all([
       supabase.from('customers').select('*'),
       supabase.from('session_types').select('*'),
       supabase.from('time_entries').select('*'),
+      db.getAll('sync_queue'),
     ]);
 
+  const pendingIds = new Set(
+    queueItems.map((item) => (item.payload as { id?: string }).id).filter(Boolean) as string[]
+  );
+
   if (customers) {
-    const tx = db.transaction('customers', 'readwrite');
-    for (const c of customers as Customer[]) {
-      await tx.store.put(c);
-    }
-    await tx.done;
+    await reconcileTable('customers', customers as Customer[], pendingIds);
   }
 
   if (sessionTypes) {
-    const tx = db.transaction('session_types', 'readwrite');
-    for (const s of sessionTypes as SessionType[]) {
-      await tx.store.put(s);
-    }
-    await tx.done;
+    await reconcileTable('session_types', sessionTypes as SessionType[], pendingIds);
   }
 
   if (timeEntries) {
-    const tx = db.transaction('time_entries', 'readwrite');
-    for (const e of timeEntries as TimeEntry[]) {
-      await tx.store.put(e);
-    }
-    await tx.done;
+    await reconcileTable('time_entries', timeEntries as TimeEntry[], pendingIds);
   }
 
   notifyDataChanged();

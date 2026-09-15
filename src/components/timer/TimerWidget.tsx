@@ -9,6 +9,7 @@ import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import { minutesToAE, minutesToHHMM } from '@/lib/ae';
+import { translateToGerman } from '@/lib/translate';
 
 const formatHHMMSS = (totalSeconds: number): string => {
   const h = Math.floor(totalSeconds / 3600);
@@ -23,10 +24,13 @@ export const TimerWidget = () => {
   const {
     timerState,
     isRunning,
+    isPaused,
     isStopped,
     elapsedSeconds,
     frozenMinutes,
     startTimer,
+    pauseTimer,
+    resumeTimer,
     stopTimer,
     saveSession,
     discardSession,
@@ -37,6 +41,7 @@ export const TimerWidget = () => {
   const [sessionTypeId, setSessionTypeId] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [translating, setTranslating] = useState(false);
 
   const customer = activeCustomers.find((c) => c.id === timerState?.customer_id);
   const sessionType = sessionTypes.find((s) => s.id === timerState?.session_type_id);
@@ -63,6 +68,17 @@ export const TimerWidget = () => {
     showToast('Session verworfen');
   };
 
+  const handleNotesBlur = async () => {
+    if (!notes.trim()) return;
+    setTranslating(true);
+    const translated = await translateToGerman(notes);
+    setTranslating(false);
+    if (translated) {
+      setNotes(translated);
+      showToast('Beschreibung automatisch ins Deutsche übersetzt', 'success');
+    }
+  };
+
   if (isStopped && frozenMinutes !== null) {
     return (
       <div className="rounded-md border border-border bg-surface p-4">
@@ -70,13 +86,19 @@ export const TimerWidget = () => {
           Dauer: <span className="font-semibold">{minutesToHHMM(frozenMinutes)}</span> ={' '}
           <span className="font-semibold">{minutesToAE(frozenMinutes).toFixed(1)} AE</span>
         </p>
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Notizen (optional)..."
-          rows={3}
-          className="mb-3 w-full rounded-md border border-border bg-surface-2 px-3 py-2 text-sm text-text outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-        />
+        <div className="mb-3">
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            onBlur={handleNotesBlur}
+            placeholder="Notizen / Beschreibung (optional, erscheint auf der Abrechnung)..."
+            rows={3}
+            className="w-full rounded-md border border-border bg-surface-2 px-3 py-2 text-sm text-text outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+          />
+          {translating && (
+            <p className="mt-1 text-xs text-text-muted">Übersetzung wird geprüft...</p>
+          )}
+        </div>
         <div className="flex gap-2">
           <Button onClick={handleSave} disabled={saving}>
             Speichern
@@ -89,21 +111,40 @@ export const TimerWidget = () => {
     );
   }
 
-  if (isRunning && timerState) {
+  if ((isRunning || isPaused) && timerState) {
     return (
       <div className="rounded-md border border-border bg-surface p-4">
-        <div className="mb-3 flex items-center gap-2 text-sm text-text">
-          <span className="pulse-dot inline-block h-2.5 w-2.5 rounded-full bg-accent" />
-          <span>
+        <div className="mb-3 flex min-w-0 items-center gap-2 text-sm text-text">
+          <span
+            className={[
+              'inline-block h-2.5 w-2.5 shrink-0 rounded-full',
+              isRunning ? 'pulse-dot bg-accent' : 'bg-warning',
+            ].join(' ')}
+          />
+          <span className="truncate" title={`${customer?.name ?? '...'} · ${sessionType?.label ?? '...'}`}>
             {customer?.name ?? '...'} · {sessionType?.label ?? '...'}
           </span>
+          {isPaused && (
+            <span className="shrink-0 text-xs font-medium text-warning">Pausiert</span>
+          )}
         </div>
         <div className="mb-4 font-mono text-4xl font-semibold text-text">
           {formatHHMMSS(elapsedSeconds)}
         </div>
-        <Button variant="danger" onClick={() => stopTimer()}>
-          Stoppen
-        </Button>
+        <div className="flex gap-2">
+          {isRunning ? (
+            <Button variant="secondary" onClick={() => pauseTimer()}>
+              Pausieren
+            </Button>
+          ) : (
+            <Button variant="primary" onClick={() => resumeTimer()}>
+              Fortsetzen
+            </Button>
+          )}
+          <Button variant="danger" onClick={() => stopTimer()}>
+            Stoppen
+          </Button>
+        </div>
       </div>
     );
   }

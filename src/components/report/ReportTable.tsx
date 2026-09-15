@@ -50,7 +50,9 @@ export const ReportTable = ({ rows, sessionTypeLabel }: ReportTableProps) => {
           <tbody>
             {rows.map((row) => (
               <tr key={row.customer.id} className="border-b border-border last:border-b-0 hover:bg-surface-2">
-                <td className="px-3 py-2 text-text">{row.customer.name}</td>
+                <td className="max-w-[220px] truncate px-3 py-2 text-text" title={row.customer.name}>
+                  {row.customer.name}
+                </td>
                 <td className="px-3 py-2 text-text">{row.entries.length}</td>
                 <td className="px-3 py-2 font-semibold text-text">{row.total_ae.toFixed(1)}</td>
                 <td className="px-3 py-2 text-text-muted">{minutesToHHMM(row.total_minutes)}</td>
@@ -79,10 +81,12 @@ export const ReportTable = ({ rows, sessionTypeLabel }: ReportTableProps) => {
             <div key={row.customer.id} className="rounded-md border border-border">
               <button
                 onClick={() => toggle(row.customer.id)}
-                className="flex w-full items-center justify-between px-4 py-3 text-left text-sm text-text hover:bg-surface-2"
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm text-text hover:bg-surface-2"
               >
-                <span>{row.customer.name}</span>
-                <span className="font-semibold">{row.total_ae.toFixed(1)} AE</span>
+                <span className="min-w-0 truncate" title={row.customer.name}>
+                  {row.customer.name}
+                </span>
+                <span className="shrink-0 font-semibold">{row.total_ae.toFixed(1)} AE</span>
               </button>
               {isOpen && (
                 <div className="overflow-x-auto border-t border-border">
@@ -102,7 +106,10 @@ export const ReportTable = ({ rows, sessionTypeLabel }: ReportTableProps) => {
                           <td className="whitespace-nowrap px-3 py-2 text-text">
                             {formatDateDDMMYYYY(entry.entry_date)}
                           </td>
-                          <td className="px-3 py-2 text-text">
+                          <td
+                            className="max-w-[140px] truncate px-3 py-2 text-text"
+                            title={sessionTypeLabel(entry.session_type_id)}
+                          >
                             {sessionTypeLabel(entry.session_type_id)}
                           </td>
                           <td className="px-3 py-2 text-text">
@@ -111,7 +118,12 @@ export const ReportTable = ({ rows, sessionTypeLabel }: ReportTableProps) => {
                           <td className="px-3 py-2 text-text-muted">
                             {minutesToHHMM(entry.duration_minutes)}
                           </td>
-                          <td className="px-3 py-2 text-text-muted">{entry.notes ?? '—'}</td>
+                          <td
+                            className="max-w-[240px] truncate px-3 py-2 text-text-muted"
+                            title={entry.notes ?? undefined}
+                          >
+                            {entry.notes ?? '—'}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

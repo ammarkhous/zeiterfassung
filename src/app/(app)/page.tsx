@@ -87,16 +87,16 @@ export default function DashboardPage() {
                 className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 last:border-b-0 hover:bg-surface-2"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm text-text">
+                  <p className="truncate text-sm text-text" title={`${customerName(entry.customer_id)} · ${sessionTypeLabel(entry.session_type_id)}`}>
                     {customerName(entry.customer_id)} · {sessionTypeLabel(entry.session_type_id)}
                   </p>
                   {entry.notes && (
-                    <p className="truncate text-xs text-text-muted">
+                    <p className="truncate text-xs text-text-muted" title={entry.notes}>
                       {entry.notes.slice(0, 60)}
                     </p>
                   )}
                 </div>
-                <div className="text-right">
+                <div className="shrink-0 text-right">
                   <p className="text-sm font-semibold text-text">
                     {minutesToAE(entry.duration_minutes).toFixed(1)} AE
                   </p>
@@ -105,8 +105,8 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 {confirmDeleteId === entry.id ? (
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="text-text-muted">Wirklich löschen?</span>
+                  <div className="flex shrink-0 items-center gap-2 text-xs">
+                    <span className="hidden text-text-muted sm:inline">Wirklich löschen?</span>
                     <Button size="sm" variant="danger" onClick={() => handleDelete(entry.id)}>
                       Ja
                     </Button>
@@ -115,7 +115,7 @@ export default function DashboardPage() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="flex gap-2">
+                  <div className="flex shrink-0 gap-2">
                     <Button size="sm" variant="secondary" onClick={() => setEditingEntry(entry)}>
                       Bearbeiten
                     </Button>
@@ -142,8 +142,13 @@ export default function DashboardPage() {
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
             {Array.from(monthByCustomer.entries()).map(([customerId, stats]) => (
-              <div key={customerId} className="rounded-md border border-border bg-surface p-3">
-                <p className="text-sm text-text">{customerName(customerId)}</p>
+              <div
+                key={customerId}
+                className="flex min-h-[84px] flex-col justify-center rounded-md border border-border bg-surface p-3"
+              >
+                <p className="truncate text-sm text-text" title={customerName(customerId)}>
+                  {customerName(customerId)}
+                </p>
                 <p className="text-xs text-text-muted">{stats.count} Sessionen</p>
                 <p className="mt-1 text-sm font-semibold text-text">
                   {minutesToAE(stats.minutes).toFixed(1)} AE

@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { Select } from '@/components/ui/Select';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { useToast } from '@/components/ui/Toast';
 import { AEInput } from './AEInput';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useSessionTypes } from '@/hooks/useSessionTypes';
+import { translateToGerman } from '@/lib/translate';
 
 export interface EntryFormValues {
   customer_id: string;
@@ -46,6 +48,19 @@ export const EntryForm = ({
   const [durationMinutes, setDurationMinutes] = useState(initialValues?.duration_minutes ?? 0);
   const [notes, setNotes] = useState(initialValues?.notes ?? '');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [translating, setTranslating] = useState(false);
+  const { showToast } = useToast();
+
+  const handleNotesBlur = async () => {
+    if (!notes.trim()) return;
+    setTranslating(true);
+    const translated = await translateToGerman(notes);
+    setTranslating(false);
+    if (translated) {
+      setNotes(translated);
+      showToast('Beschreibung automatisch ins Deutsche übersetzt', 'success');
+    }
+  };
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -114,13 +129,20 @@ export const EntryForm = ({
       {errors.duration && <p className="-mt-3 text-xs text-danger">{errors.duration}</p>}
 
       <div>
-        <label className="mb-1 block text-sm text-text-muted">Notizen</label>
+        <label className="mb-1 block text-sm text-text-muted">
+          Notizen / Beschreibung{' '}
+          <span className="text-text-muted">(erscheint auf der Abrechnung)</span>
+        </label>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
+          onBlur={handleNotesBlur}
           rows={4}
           className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-accent focus:ring-1 focus:ring-accent"
         />
+        {translating && (
+          <p className="mt-1 text-xs text-text-muted">Übersetzung wird geprüft...</p>
+        )}
       </div>
 
       <div className="flex gap-2">

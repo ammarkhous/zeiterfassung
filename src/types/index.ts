@@ -39,6 +39,8 @@ export interface TimerState {
   customer_id: string;
   session_type_id: string;
   started_at: string;
+  status: 'running' | 'paused';
+  accumulated_seconds: number;
 }
 
 export type SyncStatus = 'synced' | 'syncing' | 'offline' | 'error';

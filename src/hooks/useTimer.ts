@@ -12,6 +12,12 @@ const localDateString = (d: Date): string => {
   return `${y}-${m}-${day}`;
 };
 
+const computeElapsedSeconds = (state: TimerState): number => {
+  if (state.status === 'paused') return state.accumulated_seconds;
+  const started = new Date(state.started_at).getTime();
+  return state.accumulated_seconds + Math.floor((Date.now() - started) / 1000);
+};
+
 export const useTimer = () => {
   const [timerState, setTimerState] = useState<TimerState | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -25,24 +31,29 @@ export const useTimer = () => {
       const state = await db.get('timer_state', 'active');
       if (state) {
         setTimerState(state);
+        setElapsedSeconds(computeElapsedSeconds(state));
       }
     };
     load();
   }, []);
 
   useEffect(() => {
-    if (timerState) {
-      const tick = () => {
-        const started = new Date(timerState.started_at).getTime();
-        const now = Date.now();
-        setElapsedSeconds(Math.floor((now - started) / 1000));
-      };
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
+    if (timerState && timerState.status === 'running') {
+      const tick = () => setElapsedSeconds(computeElapsedSeconds(timerState));
       tick();
       intervalRef.current = setInterval(tick, 1000);
-      return () => {
-        if (intervalRef.current) clearInterval(intervalRef.current);
-      };
+    } else if (timerState) {
+      setElapsedSeconds(computeElapsedSeconds(timerState));
     }
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, [timerState]);
 
   const startTimer = useCallback(async (customer_id: string, session_type_id: string) => {
@@ -52,18 +63,46 @@ export const useTimer = () => {
       customer_id,
       session_type_id,
       started_at: new Date().toISOString(),
+      status: 'running',
+      accumulated_seconds: 0,
     };
     await db.put('timer_state', state);
     setTimerState(state);
     setFrozenMinutes(null);
   }, []);
 
+  const pauseTimer = useCallback(async () => {
+    if (!timerState || timerState.status !== 'running') return;
+    const db = await getDB();
+    const state: TimerState = {
+      ...timerState,
+      status: 'paused',
+      accumulated_seconds: computeElapsedSeconds(timerState),
+    };
+    await db.put('timer_state', state);
+    setTimerState(state);
+  }, [timerState]);
+
+  const resumeTimer = useCallback(async () => {
+    if (!timerState || timerState.status !== 'paused') return;
+    const db = await getDB();
+    const state: TimerState = {
+      ...timerState,
+      status: 'running',
+      started_at: new Date().toISOString(),
+    };
+    await db.put('timer_state', state);
+    setTimerState(state);
+  }, [timerState]);
+
   const stopTimer = useCallback((): number => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-    const duration = Math.max(1, Math.round(elapsedSeconds / 60));
+    if (!timerState) return 0;
+    const totalSeconds = computeElapsedSeconds(timerState);
+    const duration = Math.max(1, Math.round(totalSeconds / 60));
     setFrozenMinutes(duration);
     return duration;
-  }, [elapsedSeconds]);
+  }, [timerState]);
 
   const saveSession = useCallback(
     async (duration_minutes: number, notes: string) => {
@@ -96,11 +135,14 @@ export const useTimer = () => {
 
   return {
     timerState,
-    isRunning: !!timerState && frozenMinutes === null,
+    isRunning: !!timerState && timerState.status === 'running' && frozenMinutes === null,
+    isPaused: !!timerState && timerState.status === 'paused' && frozenMinutes === null,
     isStopped: !!timerState && frozenMinutes !== null,
     elapsedSeconds,
     frozenMinutes,
     startTimer,
+    pauseTimer,
+    resumeTimer,
     stopTimer,
     saveSession,
     discardSession,

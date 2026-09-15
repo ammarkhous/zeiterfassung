@@ -150,18 +150,20 @@ export default function SettingsPage() {
               ) : (
                 <div
                   key={c.id}
-                  className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 last:border-b-0 hover:bg-surface-2"
+                  className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3 last:border-b-0 hover:bg-surface-2"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm text-text">{c.name}</p>
+                    <p className="truncate text-sm text-text" title={c.name}>
+                      {c.name}
+                    </p>
                     <p className="text-xs text-text-muted">
                       {c.ae_rate.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €/AE
                     </p>
                   </div>
-                  <Badge variant={c.active ? 'success' : 'default'}>
-                    {c.active ? 'Aktiv' : 'Inaktiv'}
-                  </Badge>
-                  <div className="flex gap-2">
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    <Badge variant={c.active ? 'success' : 'default'}>
+                      {c.active ? 'Aktiv' : 'Inaktiv'}
+                    </Badge>
                     <Button
                       size="sm"
                       variant="secondary"
@@ -219,10 +221,12 @@ export default function SettingsPage() {
               ) : (
                 <div
                   key={s.id}
-                  className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 last:border-b-0 hover:bg-surface-2"
+                  className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3 last:border-b-0 hover:bg-surface-2"
                 >
-                  <p className="text-sm text-text">{s.label}</p>
-                  <div className="flex gap-2">
+                  <p className="min-w-0 flex-1 truncate text-sm text-text" title={s.label}>
+                    {s.label}
+                  </p>
+                  <div className="flex shrink-0 gap-2">
                     <Button size="sm" variant="secondary" onClick={() => startEditType(s.id, s.label)}>
                       Bearbeiten
                     </Button>
