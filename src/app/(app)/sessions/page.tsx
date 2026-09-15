@@ -6,13 +6,11 @@ import { useSessionTypes } from '@/hooks/useSessionTypes';
 import { useTimeEntries } from '@/hooks/useTimeEntries';
 import { useToast } from '@/components/ui/Toast';
 import { Select } from '@/components/ui/Select';
-import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { MonthYearPicker } from '@/components/ui/MonthYearPicker';
-import { AEInput } from '@/components/entry/AEInput';
+import { EntryForm, EntryFormValues } from '@/components/entry/EntryForm';
 import { minutesToAE, minutesToHHMM, formatAE } from '@/lib/ae';
-import { translateToGerman } from '@/lib/translate';
 import { TimeEntry } from '@/types';
 
 const PAGE_SIZE = 50;
@@ -37,15 +35,9 @@ export default function SessionsPage() {
   const [typeFilter, setTypeFilter] = useState('');
   const [monthFilter, setMonthFilter] = useState(currentMonthValue());
   const [page, setPage] = useState(1);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
   const [expandedNotesId, setExpandedNotesId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TimeEntry | null>(null);
-
-  const [editCustomerId, setEditCustomerId] = useState('');
-  const [editTypeId, setEditTypeId] = useState('');
-  const [editDate, setEditDate] = useState('');
-  const [editMinutes, setEditMinutes] = useState(0);
-  const [editNotes, setEditNotes] = useState('');
 
   const customerName = (id: string) => customers.find((c) => c.id === id)?.name ?? '—';
   const sessionTypeLabel = (id: string) => sessionTypes.find((s) => s.id === id)?.label ?? '—';
@@ -64,25 +56,10 @@ export default function SessionsPage() {
 
   const totalMinutes = filtered.reduce((sum, e) => sum + e.duration_minutes, 0);
 
-  const startEdit = (entry: TimeEntry) => {
-    setEditingId(entry.id);
-    setEditCustomerId(entry.customer_id);
-    setEditTypeId(entry.session_type_id);
-    setEditDate(entry.entry_date);
-    setEditMinutes(entry.duration_minutes);
-    setEditNotes(entry.notes ?? '');
-  };
-
-  const saveEdit = async () => {
-    if (!editingId) return;
-    await updateEntry(editingId, {
-      customer_id: editCustomerId,
-      session_type_id: editTypeId,
-      entry_date: editDate,
-      duration_minutes: editMinutes,
-      notes: editNotes || null,
-    });
-    setEditingId(null);
+  const handleUpdate = async (values: EntryFormValues) => {
+    if (!editingEntry) return;
+    await updateEntry(editingEntry.id, values);
+    setEditingEntry(null);
     showToast('Eintrag aktualisiert', 'success');
   };
 
@@ -151,117 +128,60 @@ export default function SessionsPage() {
               </tr>
             </thead>
             <tbody>
-              {pageEntries.map((entry) =>
-                editingId === entry.id ? (
-                  <tr key={entry.id} className="border-b border-border bg-surface-2">
-                    <td className="px-3 py-2">
-                      <Input
-                        type="date"
-                        value={editDate}
-                        onChange={(e) => setEditDate(e.target.value)}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <Select value={editCustomerId} onChange={(e) => setEditCustomerId(e.target.value)}>
-                        {activeCustomers.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </Select>
-                    </td>
-                    <td className="px-3 py-2">
-                      <Select value={editTypeId} onChange={(e) => setEditTypeId(e.target.value)}>
-                        {sessionTypes.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.label}
-                          </option>
-                        ))}
-                      </Select>
-                    </td>
-                    <td className="px-3 py-2">
-                      <AEInput minutes={editMinutes} onChange={setEditMinutes} />
-                    </td>
-                    <td className="px-3 py-2">
-                      <Input
-                        value={editNotes}
-                        onChange={(e) => setEditNotes(e.target.value)}
-                        onBlur={async () => {
-                          if (!editNotes.trim()) return;
-                          const translated = await translateToGerman(editNotes);
-                          if (translated) {
-                            setEditNotes(translated);
-                            showToast('Beschreibung automatisch ins Deutsche übersetzt', 'success');
-                          }
-                        }}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={saveEdit}>
-                          Speichern
-                        </Button>
-                        <Button size="sm" variant="secondary" onClick={() => setEditingId(null)}>
-                          Abbrechen
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  <tr key={entry.id} className="border-b border-border last:border-b-0 hover:bg-surface-2">
-                    <td className="whitespace-nowrap px-3 py-2 text-text">
-                      {formatDateDDMMYYYY(entry.entry_date)}
-                    </td>
-                    <td
-                      className="max-w-[180px] truncate px-3 py-2 text-text"
-                      title={customerName(entry.customer_id)}
-                    >
-                      {customerName(entry.customer_id)}
-                    </td>
-                    <td
-                      className="max-w-[140px] truncate px-3 py-2 text-text"
-                      title={sessionTypeLabel(entry.session_type_id)}
-                    >
-                      {sessionTypeLabel(entry.session_type_id)}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2">
-                      <div className="font-semibold text-text">
-                        {minutesToAE(entry.duration_minutes).toFixed(1)} AE
-                      </div>
-                      <div className="text-xs text-text-muted">
-                        {minutesToHHMM(entry.duration_minutes)}
-                      </div>
-                    </td>
-                    <td
-                      className={[
-                        'max-w-[220px] cursor-pointer px-3 py-2 text-text-muted',
-                        expandedNotesId === entry.id ? '' : 'truncate',
-                      ].join(' ')}
-                      onClick={() =>
-                        setExpandedNotesId(expandedNotesId === entry.id ? null : entry.id)
-                      }
-                    >
-                      {entry.notes
-                        ? expandedNotesId === entry.id
-                          ? entry.notes
-                          : entry.notes.length > 60
-                          ? entry.notes.slice(0, 60) + '…'
-                          : entry.notes
-                        : '—'}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2">
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="secondary" onClick={() => startEdit(entry)}>
-                          Bearbeiten
-                        </Button>
-                        <Button size="sm" variant="danger" onClick={() => setDeleteTarget(entry)}>
-                          Löschen
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              )}
+              {pageEntries.map((entry) => (
+                <tr key={entry.id} className="border-b border-border last:border-b-0 hover:bg-surface-2">
+                  <td className="whitespace-nowrap px-3 py-2 text-text">
+                    {formatDateDDMMYYYY(entry.entry_date)}
+                  </td>
+                  <td
+                    className="max-w-[180px] truncate px-3 py-2 text-text"
+                    title={customerName(entry.customer_id)}
+                  >
+                    {customerName(entry.customer_id)}
+                  </td>
+                  <td
+                    className="max-w-[140px] truncate px-3 py-2 text-text"
+                    title={sessionTypeLabel(entry.session_type_id)}
+                  >
+                    {sessionTypeLabel(entry.session_type_id)}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    <div className="font-semibold text-text">
+                      {minutesToAE(entry.duration_minutes).toFixed(1)} AE
+                    </div>
+                    <div className="text-xs text-text-muted">
+                      {minutesToHHMM(entry.duration_minutes)}
+                    </div>
+                  </td>
+                  <td
+                    className={[
+                      'max-w-[220px] cursor-pointer px-3 py-2 text-text-muted',
+                      expandedNotesId === entry.id ? '' : 'truncate',
+                    ].join(' ')}
+                    onClick={() =>
+                      setExpandedNotesId(expandedNotesId === entry.id ? null : entry.id)
+                    }
+                  >
+                    {entry.notes
+                      ? expandedNotesId === entry.id
+                        ? entry.notes
+                        : entry.notes.length > 60
+                        ? entry.notes.slice(0, 60) + '…'
+                        : entry.notes
+                      : '—'}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="secondary" onClick={() => setEditingEntry(entry)}>
+                        Bearbeiten
+                      </Button>
+                      <Button size="sm" variant="danger" onClick={() => setDeleteTarget(entry)}>
+                        Löschen
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
           <div className="flex justify-end bg-surface-2 px-4 py-2 text-sm text-text">
@@ -294,6 +214,23 @@ export default function SessionsPage() {
           </Button>
         </div>
       )}
+
+      <Modal open={!!editingEntry} onClose={() => setEditingEntry(null)} title="Eintrag bearbeiten">
+        {editingEntry && (
+          <EntryForm
+            initialValues={{
+              customer_id: editingEntry.customer_id,
+              session_type_id: editingEntry.session_type_id,
+              entry_date: editingEntry.entry_date,
+              duration_minutes: editingEntry.duration_minutes,
+              notes: editingEntry.notes ?? '',
+            }}
+            onSubmit={handleUpdate}
+            onCancel={() => setEditingEntry(null)}
+            submitLabel="Speichern"
+          />
+        )}
+      </Modal>
 
       <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Eintrag löschen">
         <p className="mb-4 text-sm text-text">Eintrag wirklich löschen?</p>

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
+import { UpdatePrompt } from '@/components/nav/UpdatePrompt';
 import './globals.css';
 
 const inter = Inter({
@@ -33,7 +34,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="de">
-      <body className={`${inter.variable} antialiased`}>{children}</body>
+      <body className={`${inter.variable} antialiased`}>
+        <UpdatePrompt />
+        {children}
+      </body>
     </html>
   );
 }
