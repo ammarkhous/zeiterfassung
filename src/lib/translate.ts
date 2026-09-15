@@ -1,19 +1,4 @@
 const ARABIC_REGEX = /[؀-ۿ]/;
-const GERMAN_MARKERS = /[äöüÄÖÜß]/;
-const GERMAN_STOPWORDS =
-  /\b(und|ist|nicht|der|die|das|mit|für|auf|ich|du|wir|sie|von|zu|im|am|ein|eine|einen|wurde|wird|kann|muss|soll|haben|sein|hat|habe|heute|gestern|kunde|arbeit)\b/i;
-const LATIN_ONLY = /^[a-zA-Z0-9\s.,!?'"()\-:;/&%€@]+$/;
-
-export type DetectedLanguage = 'ar' | 'en';
-
-export const detectSourceLanguage = (text: string): DetectedLanguage | null => {
-  const trimmed = text.trim();
-  if (trimmed.length < 3) return null;
-  if (ARABIC_REGEX.test(trimmed)) return 'ar';
-  if (GERMAN_MARKERS.test(trimmed) || GERMAN_STOPWORDS.test(trimmed)) return null;
-  if (LATIN_ONLY.test(trimmed)) return 'en';
-  return null;
-};
 
 const fetchWithTimeout = async (url: string, timeoutMs: number): Promise<Response> => {
   const controller = new AbortController();
@@ -25,11 +10,20 @@ const fetchWithTimeout = async (url: string, timeoutMs: number): Promise<Respons
   }
 };
 
+interface GoogleTranslateResult {
+  translated: string;
+  detectedLang: string;
+}
+
 // Google's public web-translate endpoint. Unofficial and undocumented (no API key,
-// no billing), used client-side the same way many browser extensions do. Quality is
-// much better than free dictionary-style APIs. Can be rate-limited by Google without
-// notice, hence the MyMemory fallback below.
-const translateViaGoogle = async (text: string, source: DetectedLanguage): Promise<string | null> => {
+// no billing), used client-side the same way many browser extensions do. `sl=auto`
+// lets Google detect the source language itself, which is far more reliable than any
+// regex heuristic we could write (umlauts/dashes/quotes in otherwise-English text
+// used to trip up a hand-rolled detector).
+const translateViaGoogle = async (
+  text: string,
+  source: string
+): Promise<GoogleTranslateResult | null> => {
   const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${source}&tl=de&dt=t&q=${encodeURIComponent(
     text
   )}`;
@@ -41,11 +35,12 @@ const translateViaGoogle = async (text: string, source: DetectedLanguage): Promi
   if (!Array.isArray(segments) || segments.length === 0) return null;
 
   const translated = segments.map((seg) => seg[0]).join('');
-  if (!translated || translated.trim().toLowerCase() === text.trim().toLowerCase()) return null;
-  return translated;
+  const detectedLang = (data?.[2] as string | undefined) ?? source;
+  if (!translated) return null;
+  return { translated, detectedLang };
 };
 
-const translateViaMyMemory = async (text: string, source: DetectedLanguage): Promise<string | null> => {
+const translateViaMyMemory = async (text: string, source: 'ar' | 'en'): Promise<string | null> => {
   const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${source}|de`;
   const res = await fetchWithTimeout(url, 6000);
   if (!res.ok) return null;
@@ -63,18 +58,26 @@ const translateViaMyMemory = async (text: string, source: DetectedLanguage): Pro
 };
 
 export const translateToGerman = async (text: string): Promise<string | null> => {
-  const source = detectSourceLanguage(text);
-  if (!source) return null;
+  const trimmed = text.trim();
+  if (trimmed.length < 3) return null;
 
   try {
-    const viaGoogle = await translateViaGoogle(text, source);
-    if (viaGoogle) return viaGoogle;
+    const result = await translateViaGoogle(trimmed, 'auto');
+    if (result) {
+      if (result.detectedLang === 'de') return null; // already German
+      if (result.translated.trim().toLowerCase() === trimmed.toLowerCase()) return null;
+      return result.translated;
+    }
   } catch {
-    // fall through to backup provider
+    // fall through to backup provider below
   }
 
+  // Google unreachable: fall back to MyMemory, which needs an explicit source
+  // language rather than auto-detection. Only handle the case we can detect
+  // ourselves reliably (Arabic script); otherwise skip rather than guess wrong.
+  if (!ARABIC_REGEX.test(trimmed)) return null;
   try {
-    return await translateViaMyMemory(text, source);
+    return await translateViaMyMemory(trimmed, 'ar');
   } catch {
     return null;
   }
