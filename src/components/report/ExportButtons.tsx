@@ -123,6 +123,15 @@ export const ExportButtons = ({ rows, year, month, sessionTypeLabel }: ExportBut
         ]),
         headStyles: { fillColor: [34, 37, 53] },
         styles: { fontSize: 8 },
+        // Fixed widths for every column except Notizen (which fills the rest) so
+        // the Notizen column starts at the same x position in every customer's
+        // table, regardless of that table's own content lengths.
+        columnStyles: {
+          0: { cellWidth: 22 },
+          1: { cellWidth: 30 },
+          2: { cellWidth: 14 },
+          3: { cellWidth: 16 },
+        },
       });
 
       finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;

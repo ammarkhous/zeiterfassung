@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { Select } from '@/components/ui/Select';
-import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { useToast } from '@/components/ui/Toast';
 import { AEInput } from './AEInput';
 import { useCustomers } from '@/hooks/useCustomers';
@@ -116,14 +116,11 @@ export const EntryForm = ({
         ))}
       </Select>
 
-      <Input
-        label="Datum *"
-        type="date"
-        value={entryDate}
-        onChange={(e) => setEntryDate(e.target.value)}
-        error={errors.entry_date}
-        fullWidth
-      />
+      <div>
+        <label className="mb-1 block text-sm text-text-muted">Datum *</label>
+        <DatePicker value={entryDate} onChange={setEntryDate} />
+        {errors.entry_date && <p className="mt-1 text-xs text-danger">{errors.entry_date}</p>}
+      </div>
 
       <AEInput minutes={durationMinutes} onChange={setDurationMinutes} />
       {errors.duration && <p className="-mt-3 text-xs text-danger">{errors.duration}</p>}

@@ -1,21 +1,7 @@
 'use client';
 
 import { Select } from './Select';
-
-const GERMAN_MONTHS = [
-  'Januar',
-  'Februar',
-  'März',
-  'April',
-  'Mai',
-  'Juni',
-  'Juli',
-  'August',
-  'September',
-  'Oktober',
-  'November',
-  'Dezember',
-];
+import { GERMAN_MONTHS } from '@/lib/germanMonths';
 
 interface MonthYearPickerProps {
   value: string; // "YYYY-MM"
