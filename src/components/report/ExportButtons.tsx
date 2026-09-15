@@ -1,10 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Button } from '@/components/ui/Button';
 import { MonthlyReportRow } from '@/types';
 import { minutesToAE, minutesToHHMM } from '@/lib/ae';
+import { translateToGerman } from '@/lib/translate';
 
 const GERMAN_MONTHS = [
   'Januar',
@@ -29,6 +31,24 @@ const formatDateDDMMYYYY = (isoDate: string): string => {
   return `${d}.${m}.${y}`;
 };
 
+const buildGermanNotesMap = async (rows: MonthlyReportRow[]): Promise<Map<string, string>> => {
+  const uniqueNotes = new Set<string>();
+  for (const row of rows) {
+    for (const entry of row.entries) {
+      if (entry.notes) uniqueNotes.add(entry.notes);
+    }
+  }
+
+  const map = new Map<string, string>();
+  await Promise.all(
+    Array.from(uniqueNotes).map(async (note) => {
+      const translated = await translateToGerman(note);
+      if (translated) map.set(note, translated);
+    })
+  );
+  return map;
+};
+
 interface ExportButtonsProps {
   rows: MonthlyReportRow[];
   year: number;
@@ -37,10 +57,15 @@ interface ExportButtonsProps {
 }
 
 export const ExportButtons = ({ rows, year, month, sessionTypeLabel }: ExportButtonsProps) => {
+  const [exporting, setExporting] = useState<'pdf' | 'csv' | null>(null);
   const monthLabel = GERMAN_MONTHS[month];
   const fileSuffix = `${year}-${(month + 1).toString().padStart(2, '0')}`;
 
-  const handlePdfExport = () => {
+  const handlePdfExport = async () => {
+    setExporting('pdf');
+    const germanNotes = await buildGermanNotesMap(rows);
+    const noteFor = (notes: string | null) => (notes ? germanNotes.get(notes) ?? notes : '');
+
     const doc = new jsPDF();
     const createdDate = new Date().toLocaleDateString('de-DE');
 
@@ -94,7 +119,7 @@ export const ExportButtons = ({ rows, year, month, sessionTypeLabel }: ExportBut
           sessionTypeLabel(e.session_type_id),
           minutesToAE(e.duration_minutes).toFixed(1),
           minutesToHHMM(e.duration_minutes),
-          e.notes ?? '',
+          noteFor(e.notes),
         ]),
         headStyles: { fillColor: [34, 37, 53] },
         styles: { fontSize: 8 },
@@ -112,9 +137,14 @@ export const ExportButtons = ({ rows, year, month, sessionTypeLabel }: ExportBut
     }
 
     doc.save(`Abrechnung_${fileSuffix}.pdf`);
+    setExporting(null);
   };
 
-  const handleCsvExport = () => {
+  const handleCsvExport = async () => {
+    setExporting('csv');
+    const germanNotes = await buildGermanNotesMap(rows);
+    const noteFor = (notes: string | null) => (notes ? germanNotes.get(notes) ?? notes : '');
+
     const header = 'Datum;Kunde;Typ;AE;Minuten;Notizen;Satz_EUR_pro_AE;Wert_EUR';
     const lines: string[] = [header];
 
@@ -122,7 +152,7 @@ export const ExportButtons = ({ rows, year, month, sessionTypeLabel }: ExportBut
       for (const entry of row.entries) {
         const ae = minutesToAE(entry.duration_minutes);
         const value = ae * row.customer.ae_rate;
-        const notes = (entry.notes ?? '').replace(/;/g, ',').replace(/\n/g, ' ');
+        const notes = noteFor(entry.notes).replace(/;/g, ',').replace(/\n/g, ' ');
         lines.push(
           [
             formatDateDDMMYYYY(entry.entry_date),
@@ -148,13 +178,16 @@ export const ExportButtons = ({ rows, year, month, sessionTypeLabel }: ExportBut
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    setExporting(null);
   };
 
   return (
     <div className="flex gap-2">
-      <Button onClick={handlePdfExport}>PDF exportieren</Button>
-      <Button variant="secondary" onClick={handleCsvExport}>
-        CSV exportieren
+      <Button onClick={handlePdfExport} disabled={exporting !== null}>
+        {exporting === 'pdf' ? 'Wird exportiert...' : 'PDF exportieren'}
+      </Button>
+      <Button variant="secondary" onClick={handleCsvExport} disabled={exporting !== null}>
+        {exporting === 'csv' ? 'Wird exportiert...' : 'CSV exportieren'}
       </Button>
     </div>
   );

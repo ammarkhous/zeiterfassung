@@ -12,10 +12,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<Variant, string> = {
-  primary: 'bg-accent text-white hover:brightness-110 disabled:opacity-50',
-  secondary: 'bg-surface-2 border border-border text-text hover:bg-border disabled:opacity-50',
-  danger: 'bg-danger text-white hover:brightness-110 disabled:opacity-50',
-  ghost: 'bg-transparent text-text hover:bg-surface-2 disabled:opacity-50',
+  primary: 'border border-transparent bg-accent text-white hover:brightness-110 disabled:opacity-50',
+  secondary: 'border border-border bg-surface-2 text-text hover:bg-border disabled:opacity-50',
+  danger: 'border border-transparent bg-danger text-white hover:brightness-110 disabled:opacity-50',
+  ghost: 'border border-transparent bg-transparent text-text hover:bg-surface-2 disabled:opacity-50',
 };
 
 const sizeClasses: Record<Size, string> = {
