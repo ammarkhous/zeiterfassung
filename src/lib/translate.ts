@@ -45,20 +45,37 @@ const translateViaGoogle = async (
   return { translated, detectedLang };
 };
 
+// MyMemory hard-rejects anything over 500 characters with a plain-text error
+// ("QUERY LENGTH LIMIT EXCEEDED...") delivered inside responseData.translatedText,
+// the exact same field a real translation comes back in. A previous version of this
+// function only filtered out responses containing the word "MYMEMORY", which missed
+// this and other error strings entirely, letting an error message get treated as a
+// valid translation and silently overwrite real user data. Never even attempt the
+// call once text is too long, and validate the response defensively on top of that.
+const MYMEMORY_MAX_LENGTH = 480;
+
+const looksLikeMyMemoryError = (translated: string, original: string): boolean => {
+  const upper = translated.toUpperCase();
+  if (translated === upper && translated.length > 15) return true; // all-caps system message
+  if (upper.includes('MYMEMORY')) return true;
+  if (upper.includes('QUERY LENGTH LIMIT')) return true;
+  if (upper.includes('INVALID') && upper.includes('LANGUAGE')) return true;
+  if (translated.trim().toLowerCase() === original.trim().toLowerCase()) return true;
+  return false;
+};
+
 const translateViaMyMemory = async (text: string, source: 'ar' | 'en'): Promise<string | null> => {
+  if (text.length > MYMEMORY_MAX_LENGTH) return null;
+
   const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${source}|de`;
   const res = await fetchWithTimeout(url, 6000);
   if (!res.ok) return null;
 
   const data = await res.json();
+  if (data?.responseStatus && data.responseStatus !== 200) return null;
+
   const translated = data?.responseData?.translatedText as string | undefined;
-  if (
-    !translated ||
-    translated.toUpperCase().includes('MYMEMORY') ||
-    translated.trim().toLowerCase() === text.trim().toLowerCase()
-  ) {
-    return null;
-  }
+  if (!translated || looksLikeMyMemoryError(translated, text)) return null;
   return translated;
 };
 
