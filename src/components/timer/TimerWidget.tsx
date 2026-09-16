@@ -51,10 +51,29 @@ export const TimerWidget = () => {
     await startTimer(customerId, sessionTypeId);
   };
 
+  // Returns the final (possibly translated) notes text. Always awaited before a
+  // save actually happens (see handleSave) so a save can never race ahead of the
+  // async translation and persist the untranslated original - onBlur alone isn't
+  // reliable, since a Save click right after editing notes can fire before the
+  // blur-triggered translation resolves.
+  const translateNotesIfNeeded = async (currentNotes: string): Promise<string> => {
+    if (!currentNotes.trim()) return currentNotes;
+    setTranslating(true);
+    const translated = await translateToGerman(currentNotes);
+    setTranslating(false);
+    if (translated) {
+      setNotes(translated);
+      showToast('Beschreibung automatisch ins Deutsche übersetzt', 'success');
+      return translated;
+    }
+    return currentNotes;
+  };
+
   const handleSave = async () => {
     if (frozenMinutes === null) return;
     setSaving(true);
-    await saveSession(frozenMinutes, notes);
+    const finalNotes = await translateNotesIfNeeded(notes);
+    await saveSession(frozenMinutes, finalNotes);
     setSaving(false);
     setNotes('');
     setCustomerId('');
@@ -68,15 +87,8 @@ export const TimerWidget = () => {
     showToast('Session verworfen');
   };
 
-  const handleNotesBlur = async () => {
-    if (!notes.trim()) return;
-    setTranslating(true);
-    const translated = await translateToGerman(notes);
-    setTranslating(false);
-    if (translated) {
-      setNotes(translated);
-      showToast('Beschreibung automatisch ins Deutsche übersetzt', 'success');
-    }
+  const handleNotesBlur = () => {
+    translateNotesIfNeeded(notes);
   };
 
   if (isStopped && frozenMinutes !== null) {

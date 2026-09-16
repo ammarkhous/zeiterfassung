@@ -51,15 +51,26 @@ export const EntryForm = ({
   const [translating, setTranslating] = useState(false);
   const { showToast } = useToast();
 
-  const handleNotesBlur = async () => {
-    if (!notes.trim()) return;
+  // Returns the final (possibly translated) notes text. Always awaited before a
+  // save actually happens (see handleSubmit) so a save can never race ahead of
+  // the async translation and persist the untranslated original - onBlur alone
+  // isn't reliable, since a Save click right after editing notes can fire before
+  // the blur-triggered translation resolves.
+  const translateNotesIfNeeded = async (currentNotes: string): Promise<string> => {
+    if (!currentNotes.trim()) return currentNotes;
     setTranslating(true);
-    const translated = await translateToGerman(notes);
+    const translated = await translateToGerman(currentNotes);
     setTranslating(false);
     if (translated) {
       setNotes(translated);
       showToast('Beschreibung automatisch ins Deutsche übersetzt', 'success');
+      return translated;
     }
+    return currentNotes;
+  };
+
+  const handleNotesBlur = () => {
+    translateNotesIfNeeded(notes);
   };
 
   const validate = (): boolean => {
@@ -75,12 +86,13 @@ export const EntryForm = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
+    const finalNotes = await translateNotesIfNeeded(notes);
     await onSubmit({
       customer_id: customerId,
       session_type_id: sessionTypeId,
       entry_date: entryDate,
       duration_minutes: durationMinutes,
-      notes,
+      notes: finalNotes,
     });
   };
 
