@@ -1,4 +1,9 @@
 const ARABIC_REGEX = /[؀-ۿ]/;
+const GERMAN_MARKERS = /[äöüÄÖÜß]/;
+const GERMAN_STOPWORDS =
+  /\b(und|ist|nicht|der|die|das|mit|für|auf|ich|du|wir|sie|von|zu|im|am|ein|eine|einen|wurde|wird|kann|muss|soll|haben|sein|hat|habe|heute|gestern|kunde|arbeit)\b/i;
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 const fetchWithTimeout = async (url: string, timeoutMs: number): Promise<Response> => {
   const controller = new AbortController();
@@ -61,23 +66,37 @@ export const translateToGerman = async (text: string): Promise<string | null> =>
   const trimmed = text.trim();
   if (trimmed.length < 3) return null;
 
-  try {
-    const result = await translateViaGoogle(trimmed, 'auto');
-    if (result) {
-      if (result.detectedLang === 'de') return null; // already German
-      if (result.translated.trim().toLowerCase() === trimmed.toLowerCase()) return null;
-      return result.translated;
+  // Try Google twice (it's an unofficial endpoint that can have transient blips)
+  // before giving up and falling back to MyMemory.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const result = await translateViaGoogle(trimmed, 'auto');
+      if (result) {
+        if (result.detectedLang === 'de') return null; // already German
+        if (result.translated.trim().toLowerCase() === trimmed.toLowerCase()) return null;
+        return result.translated;
+      }
+    } catch {
+      // fall through to retry / backup provider below
     }
-  } catch {
-    // fall through to backup provider below
+    if (attempt === 0) await sleep(800);
   }
 
   // Google unreachable: fall back to MyMemory, which needs an explicit source
-  // language rather than auto-detection. Only handle the case we can detect
-  // ourselves reliably (Arabic script); otherwise skip rather than guess wrong.
-  if (!ARABIC_REGEX.test(trimmed)) return null;
+  // language rather than auto-detection. Arabic script is unambiguous; for
+  // Latin-script text, assume English unless it already looks German (umlauts
+  // or common German stopwords) - a conservative guess, but better than no
+  // fallback at all when the primary (much more reliable) provider is down.
+  let fallbackSource: 'ar' | 'en' | null = null;
+  if (ARABIC_REGEX.test(trimmed)) {
+    fallbackSource = 'ar';
+  } else if (!GERMAN_MARKERS.test(trimmed) && !GERMAN_STOPWORDS.test(trimmed)) {
+    fallbackSource = 'en';
+  }
+  if (!fallbackSource) return null;
+
   try {
-    return await translateViaMyMemory(trimmed, 'ar');
+    return await translateViaMyMemory(trimmed, fallbackSource);
   } catch {
     return null;
   }
