@@ -1,8 +1,3 @@
-const ARABIC_REGEX = /[؀-ۿ]/;
-const GERMAN_MARKERS = /[äöüÄÖÜß]/;
-const GERMAN_STOPWORDS =
-  /\b(und|ist|nicht|der|die|das|mit|für|auf|ich|du|wir|sie|von|zu|im|am|ein|eine|einen|wurde|wird|kann|muss|soll|haben|sein|hat|habe|heute|gestern|kunde|arbeit)\b/i;
-
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 const fetchWithTimeout = async (url: string, timeoutMs: number): Promise<Response> => {
@@ -15,20 +10,19 @@ const fetchWithTimeout = async (url: string, timeoutMs: number): Promise<Respons
   }
 };
 
-interface GoogleTranslateResult {
+interface TranslateResult {
   translated: string;
   detectedLang: string;
 }
 
-// Google's public web-translate endpoint. Unofficial and undocumented (no API key,
-// no billing), used client-side the same way many browser extensions do. `sl=auto`
-// lets Google detect the source language itself, which is far more reliable than any
-// regex heuristic we could write (umlauts/dashes/quotes in otherwise-English text
-// used to trip up a hand-rolled detector).
-const translateViaGoogle = async (
+// Google's public web-translate endpoint (translate.googleapis.com). Unofficial and
+// undocumented (no API key, no billing), used client-side the same way many browser
+// extensions do. `sl=auto` lets Google detect the source language itself, which is
+// far more reliable than any regex heuristic we could write.
+const translateViaGooglePrimary = async (
   text: string,
   source: string
-): Promise<GoogleTranslateResult | null> => {
+): Promise<TranslateResult | null> => {
   const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${source}&tl=de&dt=t&q=${encodeURIComponent(
     text
   )}`;
@@ -45,76 +39,63 @@ const translateViaGoogle = async (
   return { translated, detectedLang };
 };
 
-// MyMemory hard-rejects anything over 500 characters with a plain-text error
-// ("QUERY LENGTH LIMIT EXCEEDED...") delivered inside responseData.translatedText,
-// the exact same field a real translation comes back in. A previous version of this
-// function only filtered out responses containing the word "MYMEMORY", which missed
-// this and other error strings entirely, letting an error message get treated as a
-// valid translation and silently overwrite real user data. Never even attempt the
-// call once text is too long, and validate the response defensively on top of that.
-const MYMEMORY_MAX_LENGTH = 480;
-
-const looksLikeMyMemoryError = (translated: string, original: string): boolean => {
-  const upper = translated.toUpperCase();
-  if (translated === upper && translated.length > 15) return true; // all-caps system message
-  if (upper.includes('MYMEMORY')) return true;
-  if (upper.includes('QUERY LENGTH LIMIT')) return true;
-  if (upper.includes('INVALID') && upper.includes('LANGUAGE')) return true;
-  if (translated.trim().toLowerCase() === original.trim().toLowerCase()) return true;
-  return false;
-};
-
-const translateViaMyMemory = async (text: string, source: 'ar' | 'en'): Promise<string | null> => {
-  if (text.length > MYMEMORY_MAX_LENGTH) return null;
-
-  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${source}|de`;
+// A second, independent Google Translate endpoint on a different domain
+// (clients5.google.com, the one Chrome's own "dict-chrome-ex" extension uses). Same
+// translation quality as the primary endpoint, but a genuinely separate service, so
+// a rate limit or outage on one doesn't take down the other. Its response is always
+// structured JSON on success - unlike MyMemory, it can't return a plain-text error
+// message through the same field a real translation comes back in, which is exactly
+// what previously let an error string get saved as if it were real translated text.
+const translateViaGoogleSecondary = async (
+  text: string,
+  source: string
+): Promise<TranslateResult | null> => {
+  const url = `https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=${source}&tl=de&q=${encodeURIComponent(
+    text
+  )}`;
   const res = await fetchWithTimeout(url, 6000);
   if (!res.ok) return null;
 
   const data = await res.json();
-  if (data?.responseStatus && data.responseStatus !== 200) return null;
+  let translated: string | undefined;
+  let detectedLang: string | undefined;
 
-  const translated = data?.responseData?.translatedText as string | undefined;
-  if (!translated || looksLikeMyMemoryError(translated, text)) return null;
-  return translated;
+  if (Array.isArray(data) && Array.isArray(data[0])) {
+    translated = data[0][0];
+    detectedLang = data[0][1];
+  } else if (Array.isArray(data) && typeof data[0] === 'string') {
+    translated = data[0];
+  }
+
+  if (!translated) return null;
+  return { translated, detectedLang: detectedLang ?? source };
 };
 
 export const translateToGerman = async (text: string): Promise<string | null> => {
   const trimmed = text.trim();
   if (trimmed.length < 3) return null;
 
-  // Try Google twice (it's an unofficial endpoint that can have transient blips)
-  // before giving up and falling back to MyMemory.
-  for (let attempt = 0; attempt < 2; attempt++) {
+  const attempts = [
+    () => translateViaGooglePrimary(trimmed, 'auto'),
+    () => translateViaGoogleSecondary(trimmed, 'auto'),
+    () => translateViaGooglePrimary(trimmed, 'auto'),
+  ];
+
+  for (const attempt of attempts) {
     try {
-      const result = await translateViaGoogle(trimmed, 'auto');
+      const result = await attempt();
       if (result) {
         if (result.detectedLang === 'de') return null; // already German
         if (result.translated.trim().toLowerCase() === trimmed.toLowerCase()) return null;
         return result.translated;
       }
     } catch {
-      // fall through to retry / backup provider below
+      // try the next endpoint
     }
-    if (attempt === 0) await sleep(800);
+    await sleep(500);
   }
 
-  // Google unreachable: fall back to MyMemory, which needs an explicit source
-  // language rather than auto-detection. Arabic script is unambiguous; for
-  // Latin-script text, assume English unless it already looks German (umlauts
-  // or common German stopwords) - a conservative guess, but better than no
-  // fallback at all when the primary (much more reliable) provider is down.
-  let fallbackSource: 'ar' | 'en' | null = null;
-  if (ARABIC_REGEX.test(trimmed)) {
-    fallbackSource = 'ar';
-  } else if (!GERMAN_MARKERS.test(trimmed) && !GERMAN_STOPWORDS.test(trimmed)) {
-    fallbackSource = 'en';
-  }
-  if (!fallbackSource) return null;
-
-  try {
-    return await translateViaMyMemory(trimmed, fallbackSource);
-  } catch {
-    return null;
-  }
+  // Both Google endpoints failed: leave the text untouched rather than risk
+  // returning anything that isn't a verified real translation.
+  return null;
 };
