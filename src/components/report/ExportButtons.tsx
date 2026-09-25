@@ -66,17 +66,90 @@ export const ExportButtons = ({ rows, year, month, sessionTypeLabel }: ExportBut
     const germanNotes = await buildGermanNotesMap(rows);
     const noteFor = (notes: string | null) => (notes ? germanNotes.get(notes) ?? notes : '');
 
-    const doc = new jsPDF();
-    const createdDate = new Date().toLocaleDateString('de-DE');
+    const ACCENT: [number, number, number] = [31, 58, 46]; // #1F3A2E
+    const LIME: [number, number, number] = [169, 217, 119]; // #A9D977
+    const LIME_DIM: [number, number, number] = [238, 248, 226]; // #EEF8E2
+    const SURFACE_2: [number, number, number] = [238, 240, 233]; // #EEF0E9
+    const BORDER: [number, number, number] = [226, 229, 218]; // #E2E5DA
+    const TEXT: [number, number, number] = [22, 35, 28]; // #16231C
+    const TEXT_MUTED: [number, number, number] = [108, 117, 104]; // #6C7568
 
-    doc.setFontSize(16);
-    doc.text(`Abrechnung ${monthLabel} ${year}`, 14, 18);
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Erstellt am: ${createdDate}`, 14, 25);
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const createdDate = new Date().toLocaleDateString('de-DE');
+    const totalAE = minutesToAE(rows.reduce((s, r) => s + r.total_minutes, 0));
+    const totalValue = rows.reduce((s, r) => s + r.total_value, 0);
+
+    const drawHeader = (full: boolean) => {
+      doc.setFillColor(...ACCENT);
+      doc.rect(0, 0, pageWidth, full ? 38 : 20, 'F');
+
+      doc.setFillColor(...LIME);
+      doc.roundedRect(14, full ? 10 : 5, 10, 10, 2.5, 2.5, 'F');
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...ACCENT);
+      doc.text('Z', 19, full ? 17.2 : 12.2, { align: 'center' });
+
+      if (!full) {
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(255, 255, 255);
+        doc.text(`Zeiterfassung · ${monthLabel} ${year}`, 28, 11.5);
+        return;
+      }
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(255, 255, 255);
+      doc.text('ZEITERFASSUNG', 28, 14);
+
+      doc.setFontSize(17);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Abrechnung ${monthLabel} ${year}`, 28, 23);
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(220, 226, 218);
+      doc.text(`Erstellt am ${createdDate}`, 28, 30);
+
+      doc.setFontSize(8);
+      doc.setTextColor(...LIME);
+      doc.text('DE · DEUTSCHES PDF', pageWidth - 14, 14, { align: 'right' });
+    };
+
+    drawHeader(true);
+
+    // Summary stat band
+    const statY = 46;
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(...BORDER);
+    doc.roundedRect(14, statY, pageWidth - 28, 22, 3, 3, 'FD');
+
+    const statColWidth = (pageWidth - 28) / 3;
+    const stats: [string, string][] = [
+      ['AE GESAMT', totalAE.toFixed(1)],
+      ['STUNDEN', minutesToHHMM(rows.reduce((s, r) => s + r.total_minutes, 0))],
+      ['GESAMTWERT', formatEUR(totalValue)],
+    ];
+    stats.forEach(([label, value], i) => {
+      const x = 14 + statColWidth * i + statColWidth / 2;
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...TEXT_MUTED);
+      doc.text(label, x, statY + 8, { align: 'center' });
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...TEXT);
+      doc.text(value, x, statY + 16, { align: 'center' });
+      if (i > 0) {
+        doc.setDrawColor(...BORDER);
+        doc.line(14 + statColWidth * i, statY + 4, 14 + statColWidth * i, statY + 18);
+      }
+    });
 
     autoTable(doc, {
-      startY: 32,
+      startY: statY + 30,
       head: [['Kunde', 'Sessionen', 'AE gesamt', 'Stunden', 'Satz (€/AE)', 'Gesamt (€)']],
       body: rows.map((r) => [
         r.customer.name,
@@ -90,26 +163,35 @@ export const ExportButtons = ({ rows, year, month, sessionTypeLabel }: ExportBut
         [
           'Summe',
           rows.reduce((s, r) => s + r.entries.length, 0).toString(),
-          minutesToAE(rows.reduce((s, r) => s + r.total_minutes, 0)).toFixed(1),
+          totalAE.toFixed(1),
           minutesToHHMM(rows.reduce((s, r) => s + r.total_minutes, 0)),
           '—',
-          formatEUR(rows.reduce((s, r) => s + r.total_value, 0)),
+          formatEUR(totalValue),
         ],
       ],
-      headStyles: { fillColor: [79, 142, 247] },
-      styles: { fontSize: 9 },
+      theme: 'grid',
+      headStyles: { fillColor: ACCENT, textColor: [255, 255, 255], fontStyle: 'bold' },
+      footStyles: { fillColor: LIME_DIM, textColor: TEXT, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: SURFACE_2 },
+      styles: { fontSize: 9, textColor: TEXT, lineColor: BORDER, lineWidth: 0.2 },
+      margin: { left: 14, right: 14 },
     });
 
-    let finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
+    let finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
 
     for (const row of rows) {
-      if (finalY > 260) {
+      if (finalY > 250) {
         doc.addPage();
-        finalY = 20;
+        drawHeader(false);
+        finalY = 32;
       }
+
+      doc.setFillColor(...LIME);
+      doc.rect(14, finalY - 4, 2.5, 6, 'F');
       doc.setFontSize(12);
-      doc.setTextColor(20);
-      doc.text(row.customer.name, 14, finalY);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...TEXT);
+      doc.text(row.customer.name, 19, finalY);
 
       autoTable(doc, {
         startY: finalY + 4,
@@ -121,8 +203,10 @@ export const ExportButtons = ({ rows, year, month, sessionTypeLabel }: ExportBut
           minutesToHHMM(e.duration_minutes),
           noteFor(e.notes),
         ]),
-        headStyles: { fillColor: [34, 37, 53] },
-        styles: { fontSize: 8 },
+        theme: 'grid',
+        headStyles: { fillColor: SURFACE_2, textColor: TEXT, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [250, 250, 248] },
+        styles: { fontSize: 8, textColor: TEXT, lineColor: BORDER, lineWidth: 0.2 },
         // Fixed widths for every column except Notizen (which fills the rest) so
         // the Notizen column starts at the same x position in every customer's
         // table, regardless of that table's own content lengths.
@@ -132,17 +216,22 @@ export const ExportButtons = ({ rows, year, month, sessionTypeLabel }: ExportBut
           2: { cellWidth: 14 },
           3: { cellWidth: 16 },
         },
+        margin: { left: 14, right: 14 },
       });
 
-      finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
+      finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 14;
     }
 
     const pageCount = doc.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
+      doc.setDrawColor(...BORDER);
+      doc.line(14, 285, pageWidth - 14, 285);
       doc.setFontSize(8);
-      doc.setTextColor(150);
-      doc.text(`Seite ${i} von ${pageCount}`, 105, 290, { align: 'center' });
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...TEXT_MUTED);
+      doc.text('Zeiterfassung', 14, 291);
+      doc.text(`Seite ${i} von ${pageCount}`, pageWidth - 14, 291, { align: 'right' });
     }
 
     doc.save(`Abrechnung_${fileSuffix}.pdf`);

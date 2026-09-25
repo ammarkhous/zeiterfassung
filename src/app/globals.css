@@ -74,6 +74,36 @@ button {
   animation: pulse 1.5s ease-in-out infinite;
 }
 
+@keyframes timer-pop-in {
+  from {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.timer-pop-in {
+  animation: timer-pop-in 400ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes timer-digit-in {
+  from {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.timer-digit-in {
+  animation: timer-digit-in 350ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both;
+}
+
 @keyframes toast-slide-in {
   from {
     transform: translateX(100%);

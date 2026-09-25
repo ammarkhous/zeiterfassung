@@ -127,19 +127,24 @@ export const TimerWidget = () => {
 
   if ((isRunning || isPaused) && timerState) {
     return (
-      <div className="rounded-3xl bg-accent p-6 text-white">
+      <div className="timer-pop-in rounded-3xl bg-accent p-6 text-white">
         <div className="mb-6 flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white/70">
-          <span
-            className={[
-              'inline-block h-2 w-2 shrink-0 rounded-full',
-              isRunning ? 'pulse-dot bg-accent-lime' : 'bg-warning',
-            ].join(' ')}
-          />
+          <span className="relative inline-flex h-2 w-2 shrink-0">
+            {isRunning && (
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-lime opacity-75" />
+            )}
+            <span
+              className={[
+                'relative inline-block h-2 w-2 rounded-full',
+                isRunning ? 'bg-accent-lime' : 'pulse-dot bg-warning',
+              ].join(' ')}
+            />
+          </span>
           <span className="truncate" title={`${customer?.name ?? '...'} · ${sessionType?.label ?? '...'}`}>
             {isPaused ? 'Pausiert' : 'Läuft'} · {customer?.name ?? '...'} · {sessionType?.label ?? '...'}
           </span>
         </div>
-        <div className="mb-2 text-center font-mono text-5xl font-bold tabular-nums sm:text-6xl">
+        <div className="timer-digit-in mb-2 text-center font-mono text-5xl font-bold tabular-nums sm:text-6xl">
           {formatHHMMSS(elapsedSeconds)}
         </div>
         <p className="mb-6 text-center text-sm text-white/60">Jede Minute zählt.</p>

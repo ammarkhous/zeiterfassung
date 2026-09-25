@@ -161,7 +161,7 @@ export default function SettingsPage() {
               ) : (
                 <div
                   key={c.id}
-                  className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3.5 last:border-b-0 hover:bg-surface-2"
+                  className="flex flex-col gap-3 border-b border-border px-4 py-3.5 last:border-b-0 hover:bg-surface-2 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-text" title={c.name}>
@@ -171,7 +171,7 @@ export default function SettingsPage() {
                       {c.ae_rate.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €/AE
                     </p>
                   </div>
-                  <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Badge variant={c.active ? 'success' : 'default'}>
                       {c.active ? 'Aktiv' : 'Inaktiv'}
                     </Badge>
@@ -242,12 +242,12 @@ export default function SettingsPage() {
               ) : (
                 <div
                   key={s.id}
-                  className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3.5 last:border-b-0 hover:bg-surface-2"
+                  className="flex flex-col gap-3 border-b border-border px-4 py-3.5 last:border-b-0 hover:bg-surface-2 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <p className="min-w-0 flex-1 truncate text-sm font-medium text-text" title={s.label}>
                     {s.label}
                   </p>
-                  <div className="flex shrink-0 gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="secondary" onClick={() => startEditType(s.id, s.label)}>
                       Bearbeiten
                     </Button>
