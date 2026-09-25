@@ -132,13 +132,17 @@ export const TimerWidget = () => {
     const ringCircumference = 2 * Math.PI * ringRadius;
     const ringOffset = ringCircumference * (1 - ringProgress);
     const ringJustWrapped = secondsInMinute === 0;
+    const cometAngle = ringProgress * 2 * Math.PI;
+    const cometX = 50 + ringRadius * Math.cos(cometAngle);
+    const cometY = 50 + ringRadius * Math.sin(cometAngle);
 
     return (
       <div className="timer-pop-in relative overflow-hidden rounded-3xl bg-accent p-6 text-white">
         {isRunning && (
           <>
-            <div className="aurora-blob aurora-blob-a -left-10 -top-10 h-56 w-56" />
-            <div className="aurora-blob aurora-blob-b -bottom-16 -right-10 h-64 w-64" />
+            <div className="liquid-blob liquid-blob-lime -left-16 -top-16 h-72 w-72" />
+            <div className="liquid-blob liquid-blob-cyan -bottom-20 -right-12 h-80 w-80" />
+            <div className="liquid-blob liquid-blob-magenta left-1/3 top-1/2 h-56 w-56" />
           </>
         )}
         <div className="relative z-10">
@@ -163,13 +167,14 @@ export const TimerWidget = () => {
             {isRunning && (
               <span className="ml-1 flex h-3 shrink-0 items-end gap-[2px]" aria-hidden>
                 <span className="eq-bar h-full w-[2px] rounded-full bg-accent-lime" style={{ animationDelay: '0s' }} />
-                <span className="eq-bar h-full w-[2px] rounded-full bg-accent-lime" style={{ animationDelay: '0.15s' }} />
+                <span className="eq-bar h-full w-[2px] rounded-full bg-[#38d9e8]" style={{ animationDelay: '0.15s' }} />
                 <span className="eq-bar h-full w-[2px] rounded-full bg-accent-lime" style={{ animationDelay: '0.3s' }} />
-                <span className="eq-bar h-full w-[2px] rounded-full bg-accent-lime" style={{ animationDelay: '0.45s' }} />
+                <span className="eq-bar h-full w-[2px] rounded-full bg-[#38d9e8]" style={{ animationDelay: '0.45s' }} />
               </span>
             )}
           </div>
-          <div className="relative mx-auto mb-6 flex h-60 w-60 items-center justify-center sm:h-72 sm:w-72">
+          <div className="timer-digit-in relative mx-auto mb-6 flex h-60 w-60 items-center justify-center sm:h-72 sm:w-72">
+            {isRunning && <span key={`shock-${elapsedSeconds}`} className="shockwave-ring" aria-hidden />}
             <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full -rotate-90">
               <circle cx="50" cy="50" r={ringRadius} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="3" />
               <circle
@@ -182,10 +187,28 @@ export const TimerWidget = () => {
                 strokeLinecap="round"
                 strokeDasharray={ringCircumference}
                 strokeDashoffset={ringOffset}
-                style={{ transition: ringJustWrapped ? 'none' : 'stroke-dashoffset 1s linear' }}
+                style={{
+                  transition: ringJustWrapped ? 'none' : 'stroke-dashoffset 1s linear',
+                  filter: isRunning ? 'drop-shadow(0 0 6px var(--accent-lime))' : 'none',
+                }}
               />
+              {isRunning && (
+                <circle
+                  cx={cometX}
+                  cy={cometY}
+                  r="3.2"
+                  fill="var(--accent-lime)"
+                  style={{ filter: 'drop-shadow(0 0 6px var(--accent-lime))' }}
+                />
+              )}
             </svg>
-            <div className="timer-digit-in relative z-10 text-center font-mono text-4xl font-bold tabular-nums sm:text-5xl">
+            <div
+              key={isRunning ? `digits-${elapsedSeconds}` : 'digits-static'}
+              className={[
+                'relative z-10 text-center font-mono text-4xl font-bold tabular-nums sm:text-5xl',
+                isRunning ? 'neon-digits glitch-jolt text-white' : 'text-white/70',
+              ].join(' ')}
+            >
               {formatHHMMSS(elapsedSeconds)}
             </div>
           </div>
