@@ -7,42 +7,32 @@ if (!fs.existsSync(outDir)) {
   fs.mkdirSync(outDir, { recursive: true });
 }
 
+const ACCENT = '#1F3A2E';
+const LIME = '#A9D977';
+
+const roundedRect = (ctx, x, y, w, h, r) => {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+};
+
 const drawIcon = (size) => {
   const canvas = createCanvas(size, size);
   const ctx = canvas.getContext('2d');
 
-  ctx.fillStyle = '#0F1117';
-  ctx.fillRect(0, 0, size, size);
-
-  const cx = size / 2;
-  const cy = size / 2;
-  const radius = size * 0.32;
-
-  ctx.strokeStyle = '#E8EAF0';
-  ctx.lineWidth = size * 0.045;
-  ctx.beginPath();
-  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.strokeStyle = '#4F8EF7';
-  ctx.lineCap = 'round';
-
-  ctx.lineWidth = size * 0.045;
-  ctx.beginPath();
-  ctx.moveTo(cx, cy);
-  ctx.lineTo(cx, cy - radius * 0.6);
-  ctx.stroke();
-
-  ctx.lineWidth = size * 0.035;
-  ctx.beginPath();
-  ctx.moveTo(cx, cy);
-  ctx.lineTo(cx + radius * 0.45, cy + radius * 0.2);
-  ctx.stroke();
-
-  ctx.fillStyle = '#E8EAF0';
-  ctx.beginPath();
-  ctx.arc(cx, cy, size * 0.02, 0, Math.PI * 2);
+  roundedRect(ctx, 0, 0, size, size, size * 0.22);
+  ctx.fillStyle = ACCENT;
   ctx.fill();
+
+  ctx.fillStyle = LIME;
+  ctx.font = `bold ${size * 0.56}px Arial, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Z', size / 2, size / 2 + size * 0.03);
 
   return canvas;
 };

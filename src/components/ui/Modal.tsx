@@ -28,10 +28,10 @@ export const Modal = ({ open, onClose, title, children }: ModalProps) => {
       onClick={onClose}
     >
       <div
-        className="mx-auto w-full max-w-lg rounded-md border border-border bg-surface p-4"
+        className="mx-auto w-full max-w-lg rounded-3xl border border-border bg-surface p-6 shadow-sm"
         onClick={(e) => e.stopPropagation()}
       >
-        {title && <h2 className="mb-3 text-base font-semibold text-text">{title}</h2>}
+        {title && <h2 className="mb-4 text-lg font-bold text-text">{title}</h2>}
         {children}
       </div>
     </div>,

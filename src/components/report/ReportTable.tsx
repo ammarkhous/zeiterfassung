@@ -35,10 +35,10 @@ export const ReportTable = ({ rows, sessionTypeLabel }: ReportTableProps) => {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="overflow-x-auto rounded-md border border-border">
+      <div className="overflow-x-auto rounded-3xl border border-border bg-surface">
         <table className="w-full min-w-[600px] text-sm">
           <thead>
-            <tr className="border-b border-border text-left text-text-muted">
+            <tr className="border-b border-border bg-surface-2 text-left text-text-muted">
               <th className="px-3 py-2 font-medium">Kunde</th>
               <th className="px-3 py-2 font-medium">Sessionen</th>
               <th className="px-3 py-2 font-medium">AE gesamt</th>
@@ -78,7 +78,7 @@ export const ReportTable = ({ rows, sessionTypeLabel }: ReportTableProps) => {
         {rows.map((row) => {
           const isOpen = expanded.has(row.customer.id);
           return (
-            <div key={row.customer.id} className="rounded-md border border-border">
+            <div key={row.customer.id} className="rounded-2xl border border-border bg-surface overflow-hidden">
               <button
                 onClick={() => toggle(row.customer.id)}
                 className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm text-text hover:bg-surface-2"
@@ -92,7 +92,7 @@ export const ReportTable = ({ rows, sessionTypeLabel }: ReportTableProps) => {
                 <div className="overflow-x-auto border-t border-border">
                   <table className="w-full min-w-[500px] text-sm">
                     <thead>
-                      <tr className="border-b border-border text-left text-text-muted">
+                      <tr className="border-b border-border bg-surface-2 text-left text-text-muted">
                         <th className="px-3 py-2 font-medium">Datum</th>
                         <th className="px-3 py-2 font-medium">Typ</th>
                         <th className="px-3 py-2 font-medium">AE</th>

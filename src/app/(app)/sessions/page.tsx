@@ -9,6 +9,8 @@ import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { MonthYearPicker } from '@/components/ui/MonthYearPicker';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ListIcon } from '@/components/nav/icons';
 import { EntryForm, EntryFormValues } from '@/components/entry/EntryForm';
 import { minutesToAE, minutesToHHMM, formatAE } from '@/lib/ae';
 import { TimeEntry } from '@/types';
@@ -72,9 +74,12 @@ export default function SessionsPage() {
 
   return (
     <div>
-      <h1 className="mb-4 text-xl font-semibold text-text">Sessions</h1>
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-muted">
+        Ihre Sessions
+      </p>
+      <h1 className="mb-4 text-3xl font-bold tracking-tight text-text">Sessions</h1>
 
-      <div className="sticky top-0 z-10 mb-4 flex flex-wrap gap-3 bg-bg py-2 pt-[calc(0.5rem+env(safe-area-inset-top))]">
+      <div className="sticky top-[calc(6.5rem+env(safe-area-inset-top))] z-10 mb-4 flex flex-wrap gap-3 bg-bg py-2">
         <Select
           value={customerFilter}
           onChange={(e) => {
@@ -113,18 +118,22 @@ export default function SessionsPage() {
       </div>
 
       {pageEntries.length === 0 ? (
-        <p className="text-sm text-text-muted">Keine Einträge für den gewählten Zeitraum.</p>
+        <EmptyState
+          icon={<ListIcon className="h-5 w-5" />}
+          title="Keine Einträge"
+          description="Für den gewählten Zeitraum wurden noch keine Sessions erfasst."
+        />
       ) : (
-        <div className="overflow-x-auto rounded-md border border-border">
+        <div className="overflow-x-auto rounded-3xl border border-border bg-surface">
           <table className="w-full min-w-[700px] text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-text-muted">
-                <th className="px-3 py-2 font-medium">Datum</th>
-                <th className="px-3 py-2 font-medium">Kunde</th>
-                <th className="px-3 py-2 font-medium">Typ</th>
-                <th className="px-3 py-2 font-medium">Dauer</th>
-                <th className="px-3 py-2 font-medium">Notizen</th>
-                <th className="px-3 py-2 font-medium">Aktionen</th>
+              <tr className="border-b border-border bg-surface-2 text-left text-text-muted">
+                <th className="px-4 py-3 font-medium">Datum</th>
+                <th className="px-4 py-3 font-medium">Kunde</th>
+                <th className="px-4 py-3 font-medium">Typ</th>
+                <th className="px-4 py-3 font-medium">Dauer</th>
+                <th className="px-4 py-3 font-medium">Notizen</th>
+                <th className="px-4 py-3 font-medium">Aktionen</th>
               </tr>
             </thead>
             <tbody>

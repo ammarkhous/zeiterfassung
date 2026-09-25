@@ -5,6 +5,7 @@ import { useCustomers } from '@/hooks/useCustomers';
 import { useSessionTypes } from '@/hooks/useSessionTypes';
 import { useTimeEntries } from '@/hooks/useTimeEntries';
 import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
 import { MonthYearPicker } from '@/components/ui/MonthYearPicker';
 import { ReportTable } from '@/components/report/ReportTable';
 import { ExportButtons } from '@/components/report/ExportButtons';
@@ -63,14 +64,25 @@ export default function ReportPage() {
 
   return (
     <div>
-      <h1 className="mb-4 text-xl font-semibold text-text">Monatsreport</h1>
-
-      <div className="mb-6 flex flex-wrap items-end gap-3">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <label className="mb-1 block text-sm text-text-muted">Monat</label>
-          <MonthYearPicker value={monthValue} onChange={setMonthValue} />
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-muted">
+            Bereit für Ihren Kunden
+          </p>
+          <h1 className="text-3xl font-bold tracking-tight text-text">Abrechnungen</h1>
         </div>
-        <Button onClick={handleGenerate}>Bericht erstellen</Button>
+        <Badge variant="success">DE · Deutsches PDF</Badge>
+      </div>
+
+      <div className="mb-6 rounded-3xl border border-border bg-surface p-6">
+        <h2 className="mb-4 text-lg font-bold text-text">Bericht erstellen</h2>
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="mb-1 block text-sm text-text-muted">Monat</label>
+            <MonthYearPicker value={monthValue} onChange={setMonthValue} />
+          </div>
+          <Button onClick={handleGenerate}>Bericht erstellen</Button>
+        </div>
       </div>
 
       {report && (

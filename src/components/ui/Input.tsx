@@ -22,7 +22,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           ref={ref}
           id={inputId}
           className={[
-            'bg-surface border rounded-md px-3 py-2 text-base text-text placeholder:text-text-muted outline-none transition-[border-color,box-shadow] duration-150 ease-out',
+            'bg-surface border rounded-xl px-4 py-2.5 text-base text-text placeholder:text-text-muted outline-none transition-[border-color,box-shadow] duration-150 ease-out',
             'focus:border-accent focus:ring-1 focus:ring-accent',
             error ? 'border-danger' : 'border-border',
             fullWidth ? 'w-full' : '',

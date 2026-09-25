@@ -38,26 +38,31 @@ export default function NewEntryPage() {
 
   return (
     <div className="max-w-lg">
-      <h1 className="mb-6 text-xl font-semibold text-text">Neue Erfassung</h1>
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-muted">
+        Arbeit nachtragen
+      </p>
+      <h1 className="mb-6 text-3xl font-bold tracking-tight text-text">Neue Erfassung</h1>
 
-      {justSaved ? (
-        <div className="flex flex-col gap-3">
-          <p className="text-sm text-text">Eintrag wurde gespeichert.</p>
-          <div className="flex gap-2">
-            <Button onClick={handleAnother}>Weiteren erfassen</Button>
-            <Button variant="secondary" onClick={() => router.push('/sessions')}>
-              Zu den Sessions
-            </Button>
+      <div className="rounded-3xl border border-border bg-surface p-6">
+        {justSaved ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-text">Eintrag wurde gespeichert.</p>
+            <div className="flex gap-2">
+              <Button onClick={handleAnother}>Weiteren erfassen</Button>
+              <Button variant="secondary" onClick={() => router.push('/sessions')}>
+                Zu den Sessions
+              </Button>
+            </div>
           </div>
-        </div>
-      ) : (
-        <EntryForm
-          key={formKey}
-          initialValues={lastValues ?? undefined}
-          onSubmit={handleSubmit}
-          submitLabel="Eintrag speichern"
-        />
-      )}
+        ) : (
+          <EntryForm
+            key={formKey}
+            initialValues={lastValues ?? undefined}
+            onSubmit={handleSubmit}
+            submitLabel="Eintrag speichern"
+          />
+        )}
+      </div>
     </div>
   );
 }

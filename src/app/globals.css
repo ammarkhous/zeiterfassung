@@ -1,17 +1,20 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #0f1117;
-  --surface: #1a1d27;
-  --surface-2: #222535;
-  --border: #2a2d3a;
-  --accent: #4f8ef7;
-  --accent-dim: #1e3a6e;
-  --text: #e8eaf0;
-  --text-muted: #6b7280;
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --danger: #ef4444;
+  --bg: #f4f5f0;
+  --surface: #ffffff;
+  --surface-2: #eef0e9;
+  --border: #e2e5da;
+  --accent: #1f3a2e;
+  --accent-dim: #e7f0e4;
+  --accent-lime: #a9d977;
+  --accent-lime-dim: #eef8e2;
+  --text: #16231c;
+  --text-muted: #6c7568;
+  --success: #3f9a52;
+  --warning: #c97a3d;
+  --warning-dim: #f7e9dd;
+  --danger: #d64545;
 }
 
 @theme inline {
@@ -21,10 +24,13 @@
   --color-border: var(--border);
   --color-accent: var(--accent);
   --color-accent-dim: var(--accent-dim);
+  --color-accent-lime: var(--accent-lime);
+  --color-accent-lime-dim: var(--accent-lime-dim);
   --color-text: var(--text);
   --color-text-muted: var(--text-muted);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-warning-dim: var(--warning-dim);
   --color-danger: var(--danger);
   --font-sans: var(--font-inter);
 }
@@ -57,7 +63,7 @@ button {
     opacity: 1;
   }
   50% {
-    opacity: 0.3;
+    opacity: 0.35;
   }
   100% {
     opacity: 1;

@@ -50,7 +50,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
               <div
                 key={t.id}
                 className={[
-                  'toast-slide-in max-w-full rounded-md border bg-surface px-4 py-3 text-sm text-text shadow-lg',
+                  'toast-slide-in max-w-full rounded-2xl border bg-surface px-4 py-3 text-sm text-text shadow-lg',
                   variantClasses[t.variant],
                 ].join(' ')}
               >

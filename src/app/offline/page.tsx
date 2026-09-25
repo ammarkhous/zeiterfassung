@@ -6,7 +6,7 @@ export default function OfflinePage() {
       <p className="text-text">Sie sind offline. Ihre lokalen Daten sind weiterhin verfügbar.</p>
       <button
         onClick={() => window.location.reload()}
-        className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-[filter] duration-150 ease-out hover:brightness-110"
+        className="rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-white transition-[filter] duration-150 ease-out hover:brightness-110"
       >
         Erneut versuchen
       </button>

@@ -49,10 +49,15 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-      <h1 className="mb-6 text-2xl font-semibold text-text">Zeiterfassung</h1>
+      <div className="mb-6 flex items-center gap-2.5">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-lg font-bold text-accent-lime">
+          Z
+        </span>
+        <span className="text-2xl font-bold tracking-tight text-text">Zeiterfassung</span>
+      </div>
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm rounded-md border border-border bg-surface p-6"
+        className="w-full max-w-sm rounded-3xl border border-border bg-surface p-6 shadow-sm"
       >
         <div className="mb-4">
           <Input

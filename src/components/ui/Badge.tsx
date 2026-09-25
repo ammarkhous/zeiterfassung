@@ -8,16 +8,16 @@ interface BadgeProps {
 }
 
 const variantClasses: Record<Variant, string> = {
-  success: 'bg-success/15 text-success border-success/30',
-  warning: 'bg-warning/15 text-warning border-warning/30',
-  danger: 'bg-danger/15 text-danger border-danger/30',
-  default: 'bg-surface-2 text-text-muted border-border',
+  success: 'bg-accent-lime-dim text-accent border-transparent',
+  warning: 'bg-warning-dim text-warning border-transparent',
+  danger: 'bg-danger/10 text-danger border-transparent',
+  default: 'bg-surface-2 text-text-muted border-transparent',
 };
 
 export const Badge = ({ variant = 'default', children }: BadgeProps) => (
   <span
     className={[
-      'inline-block rounded-md border px-2 py-0.5 text-xs font-medium',
+      'inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold',
       variantClasses[variant],
     ].join(' ')}
   >

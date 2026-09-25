@@ -1,20 +1,19 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useSessionTypes } from '@/hooks/useSessionTypes';
 import { useToast } from '@/components/ui/Toast';
-import { supabase } from '@/lib/supabase';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { PeopleIcon, TagIcon } from '@/components/nav/icons';
 
 export default function SettingsPage() {
   const { customers, addCustomer, updateCustomer, toggleActive, deleteCustomer } = useCustomers();
   const { sessionTypes, addSessionType, updateSessionType, deleteSessionType } = useSessionTypes();
   const { showToast } = useToast();
-  const router = useRouter();
 
   const [newName, setNewName] = useState('');
   const [newRate, setNewRate] = useState('');
@@ -90,21 +89,29 @@ export default function SettingsPage() {
     }
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/login');
-  };
-
   return (
     <div className="flex flex-col gap-10">
-      <h1 className="text-xl font-semibold text-text">Einstellungen</h1>
+      <div>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-muted">
+          Ihre Einstellungen
+        </p>
+        <h1 className="text-3xl font-bold tracking-tight text-text">Einstellungen</h1>
+      </div>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-muted">
-          Kunden
-        </h2>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-muted">
+              Die Menschen, denen Sie helfen
+            </p>
+            <h2 className="text-xl font-bold text-text">Kunden</h2>
+          </div>
+        </div>
 
-        <form onSubmit={handleAddCustomer} className="mb-4 flex flex-wrap items-end gap-3">
+        <form
+          onSubmit={handleAddCustomer}
+          className="mb-4 flex flex-wrap items-end gap-3 rounded-3xl border border-border bg-surface p-4"
+        >
           <Input
             label="Name *"
             value={newName}
@@ -120,14 +127,18 @@ export default function SettingsPage() {
             onChange={(e) => setNewRate(e.target.value)}
             required
           />
-          <Button type="submit">Kunden hinzufügen</Button>
+          <Button type="submit">+ Kunde hinzufügen</Button>
         </form>
 
-        <div className="overflow-hidden rounded-md border border-border">
-          {customers.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-text-muted">Noch keine Kunden.</p>
-          ) : (
-            customers.map((c) =>
+        {customers.length === 0 ? (
+          <EmptyState
+            icon={<PeopleIcon className="h-5 w-5" />}
+            title="Ihre Kunden gehören hierhin"
+            description="Fügen Sie einen Namen und einen optionalen AE-Satz hinzu."
+          />
+        ) : (
+          <div className="overflow-hidden rounded-3xl border border-border bg-surface">
+            {customers.map((c) =>
               editingCustomerId === c.id ? (
                 <div
                   key={c.id}
@@ -150,10 +161,10 @@ export default function SettingsPage() {
               ) : (
                 <div
                   key={c.id}
-                  className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3 last:border-b-0 hover:bg-surface-2"
+                  className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3.5 last:border-b-0 hover:bg-surface-2"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-text" title={c.name}>
+                    <p className="truncate text-sm font-medium text-text" title={c.name}>
                       {c.name}
                     </p>
                     <p className="text-xs text-text-muted">
@@ -180,31 +191,41 @@ export default function SettingsPage() {
                   </div>
                 </div>
               )
-            )
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-muted">
-          Session-Typen
-        </h2>
+        <div className="mb-4">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-muted">
+            Ihre Kategorien
+          </p>
+          <h2 className="text-xl font-bold text-text">Session-Typen</h2>
+        </div>
 
-        <form onSubmit={handleAddType} className="mb-4 flex flex-wrap items-end gap-3">
+        <form
+          onSubmit={handleAddType}
+          className="mb-4 flex flex-wrap items-end gap-3 rounded-3xl border border-border bg-surface p-4"
+        >
           <Input
             label="Bezeichnung *"
             value={newTypeLabel}
             onChange={(e) => setNewTypeLabel(e.target.value)}
             required
           />
-          <Button type="submit">Typ hinzufügen</Button>
+          <Button type="submit">+ Typ hinzufügen</Button>
         </form>
 
-        <div className="overflow-hidden rounded-md border border-border">
-          {sessionTypes.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-text-muted">Noch keine Typen.</p>
-          ) : (
-            sessionTypes.map((s) =>
+        {sessionTypes.length === 0 ? (
+          <EmptyState
+            icon={<TagIcon className="h-5 w-5" />}
+            title="Noch keine Typen"
+            description="Legen Sie Kategorien wie Beratung oder Entwicklung an."
+          />
+        ) : (
+          <div className="overflow-hidden rounded-3xl border border-border bg-surface">
+            {sessionTypes.map((s) =>
               editingTypeId === s.id ? (
                 <div
                   key={s.id}
@@ -221,9 +242,9 @@ export default function SettingsPage() {
               ) : (
                 <div
                   key={s.id}
-                  className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3 last:border-b-0 hover:bg-surface-2"
+                  className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3.5 last:border-b-0 hover:bg-surface-2"
                 >
-                  <p className="min-w-0 flex-1 truncate text-sm text-text" title={s.label}>
+                  <p className="min-w-0 flex-1 truncate text-sm font-medium text-text" title={s.label}>
                     {s.label}
                   </p>
                   <div className="flex shrink-0 gap-2">
@@ -236,14 +257,10 @@ export default function SettingsPage() {
                   </div>
                 </div>
               )
-            )
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </section>
-
-      <Button variant="danger" className="border border-danger bg-transparent md:hidden" onClick={handleLogout}>
-        Abmelden
-      </Button>
     </div>
   );
 }

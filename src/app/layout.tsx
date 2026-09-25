@@ -6,7 +6,7 @@ import './globals.css';
 const inter = Inter({
   variable: '--font-inter',
   subsets: ['latin'],
-  weight: ['400', '500', '600'],
+  weight: ['400', '500', '600', '700', '800'],
 });
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
@@ -17,13 +17,13 @@ export const metadata: Metadata = {
   manifest: `${basePath}/manifest.json`,
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
+    statusBarStyle: 'default',
     title: 'Zeiterfassung',
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0F1117',
+  themeColor: '#f4f5f0',
   viewportFit: 'cover',
 };
 

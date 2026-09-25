@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useSessionTypes } from '@/hooks/useSessionTypes';
 import { useTimer } from '@/hooks/useTimer';
@@ -17,6 +16,9 @@ const formatHHMMSS = (totalSeconds: number): string => {
   const s = totalSeconds % 60;
   return [h, m, s].map((v) => v.toString().padStart(2, '0')).join(':');
 };
+
+const darkFieldClass =
+  'border-white/15 bg-white/10 text-white placeholder:text-white/50 focus:border-accent-lime focus:ring-accent-lime';
 
 export const TimerWidget = () => {
   const { activeCustomers } = useCustomers();
@@ -93,19 +95,19 @@ export const TimerWidget = () => {
 
   if (isStopped && frozenMinutes !== null) {
     return (
-      <div className="rounded-md border border-border bg-surface p-4">
+      <div className="rounded-3xl border border-border bg-surface p-6">
         <p className="mb-3 text-sm text-text">
-          Dauer: <span className="font-semibold">{minutesToHHMM(frozenMinutes)}</span> ={' '}
-          <span className="font-semibold">{minutesToAE(frozenMinutes).toFixed(1)} AE</span>
+          Dauer: <span className="font-bold">{minutesToHHMM(frozenMinutes)}</span> ={' '}
+          <span className="font-bold">{minutesToAE(frozenMinutes).toFixed(1)} AE</span>
         </p>
-        <div className="mb-3">
+        <div className="mb-4">
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             onBlur={handleNotesBlur}
             placeholder="Notizen / Beschreibung (optional, erscheint auf der Abrechnung)..."
             rows={3}
-            className="w-full rounded-md border border-border bg-surface-2 px-3 py-2 text-base text-text outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+            className="w-full rounded-xl border border-border bg-surface-2 px-4 py-2.5 text-base text-text outline-none focus:border-accent focus:ring-1 focus:ring-accent"
           />
           {translating && (
             <p className="mt-1 text-xs text-text-muted">Übersetzung wird geprüft...</p>
@@ -125,35 +127,38 @@ export const TimerWidget = () => {
 
   if ((isRunning || isPaused) && timerState) {
     return (
-      <div className="rounded-md border border-border bg-surface p-4">
-        <div className="mb-3 flex min-w-0 items-center gap-2 text-sm text-text">
+      <div className="rounded-3xl bg-accent p-6 text-white">
+        <div className="mb-6 flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white/70">
           <span
             className={[
-              'inline-block h-2.5 w-2.5 shrink-0 rounded-full',
-              isRunning ? 'pulse-dot bg-accent' : 'bg-warning',
+              'inline-block h-2 w-2 shrink-0 rounded-full',
+              isRunning ? 'pulse-dot bg-accent-lime' : 'bg-warning',
             ].join(' ')}
           />
           <span className="truncate" title={`${customer?.name ?? '...'} · ${sessionType?.label ?? '...'}`}>
-            {customer?.name ?? '...'} · {sessionType?.label ?? '...'}
+            {isPaused ? 'Pausiert' : 'Läuft'} · {customer?.name ?? '...'} · {sessionType?.label ?? '...'}
           </span>
-          {isPaused && (
-            <span className="shrink-0 text-xs font-medium text-warning">Pausiert</span>
-          )}
         </div>
-        <div className="mb-4 font-mono text-4xl font-semibold text-text">
+        <div className="mb-2 text-center font-mono text-5xl font-bold tabular-nums sm:text-6xl">
           {formatHHMMSS(elapsedSeconds)}
         </div>
+        <p className="mb-6 text-center text-sm text-white/60">Jede Minute zählt.</p>
         <div className="flex gap-2">
           {isRunning ? (
-            <Button variant="secondary" onClick={() => pauseTimer()}>
+            <Button
+              variant="secondary"
+              fullWidth
+              className="border-white/15 bg-white/10 text-white hover:bg-white/20"
+              onClick={() => pauseTimer()}
+            >
               Pausieren
             </Button>
           ) : (
-            <Button variant="primary" onClick={() => resumeTimer()}>
+            <Button variant="lime" fullWidth onClick={() => resumeTimer()}>
               Fortsetzen
             </Button>
           )}
-          <Button variant="danger" onClick={() => stopTimer()}>
+          <Button variant="danger" fullWidth onClick={() => stopTimer()}>
             Stoppen
           </Button>
         </div>
@@ -162,16 +167,27 @@ export const TimerWidget = () => {
   }
 
   return (
-    <div className="rounded-md border border-border bg-surface p-4">
-      <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <div className="rounded-3xl bg-accent p-6 text-white">
+      <div className="mb-4 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-white/70">
+        <span className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-accent-lime" />
+          Bereit, wenn Sie es sind
+        </span>
+      </div>
+      <div className="mb-6 text-center font-mono text-5xl font-bold tabular-nums text-white/30 sm:text-6xl">
+        00:00:00
+      </div>
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Select
           value={customerId}
           onChange={(e) => setCustomerId(e.target.value)}
+          className={darkFieldClass}
+          chevronClassName="text-white/60"
           fullWidth
         >
-          <option value="">Kunde wählen...</option>
+          <option value="" className="text-text">Kunde wählen...</option>
           {activeCustomers.map((c) => (
-            <option key={c.id} value={c.id}>
+            <option key={c.id} value={c.id} className="text-text">
               {c.name}
             </option>
           ))}
@@ -179,24 +195,26 @@ export const TimerWidget = () => {
         <Select
           value={sessionTypeId}
           onChange={(e) => setSessionTypeId(e.target.value)}
+          className={darkFieldClass}
+          chevronClassName="text-white/60"
           fullWidth
         >
-          <option value="">Typ wählen...</option>
+          <option value="" className="text-text">Typ wählen...</option>
           {sessionTypes.map((s) => (
-            <option key={s.id} value={s.id}>
+            <option key={s.id} value={s.id} className="text-text">
               {s.label}
             </option>
           ))}
         </Select>
       </div>
-      <Button onClick={handleStart} disabled={!customerId || !sessionTypeId}>
-        Starten
+      <Button
+        variant="lime"
+        fullWidth
+        onClick={handleStart}
+        disabled={!customerId || !sessionTypeId}
+      >
+        ▶ Timer starten
       </Button>
-      <div className="mt-3">
-        <Link href="/new-entry" className="text-sm text-accent hover:underline">
-          Manuell erfassen →
-        </Link>
-      </div>
     </div>
   );
 };
