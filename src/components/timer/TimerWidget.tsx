@@ -126,46 +126,89 @@ export const TimerWidget = () => {
   }
 
   if ((isRunning || isPaused) && timerState) {
+    const secondsInMinute = elapsedSeconds % 60;
+    const ringProgress = secondsInMinute / 60;
+    const ringRadius = 16;
+    const ringCircumference = 2 * Math.PI * ringRadius;
+    const ringOffset = ringCircumference * (1 - ringProgress);
+    const ringJustWrapped = secondsInMinute === 0;
+
     return (
-      <div className="timer-pop-in rounded-3xl bg-accent p-6 text-white">
-        <div className="mb-6 flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white/70">
-          <span className="relative inline-flex h-2 w-2 shrink-0">
-            {isRunning && (
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-lime opacity-75" />
+      <div className="timer-pop-in relative overflow-hidden rounded-3xl bg-accent p-6 text-white">
+        {isRunning && (
+          <>
+            <div className="aurora-blob aurora-blob-a -left-10 -top-10 h-56 w-56" />
+            <div className="aurora-blob aurora-blob-b -bottom-16 -right-10 h-64 w-64" />
+          </>
+        )}
+        <div className="relative z-10">
+          <div className="mb-6 flex min-w-0 items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white/70">
+              <span className="relative inline-flex h-2 w-2 shrink-0">
+                {isRunning && (
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-lime opacity-75" />
+                )}
+                <span
+                  className={[
+                    'relative inline-block h-2 w-2 rounded-full',
+                    isRunning ? 'bg-accent-lime' : 'pulse-dot bg-warning',
+                  ].join(' ')}
+                />
+              </span>
+              <span
+                className="truncate"
+                title={`${customer?.name ?? '...'} · ${sessionType?.label ?? '...'}`}
+              >
+                {isPaused ? 'Pausiert' : 'Läuft'} · {customer?.name ?? '...'} · {sessionType?.label ?? '...'}
+              </span>
+              {isRunning && (
+                <span className="ml-1 flex h-3 shrink-0 items-end gap-[2px]" aria-hidden>
+                  <span className="eq-bar h-full w-[2px] rounded-full bg-accent-lime" style={{ animationDelay: '0s' }} />
+                  <span className="eq-bar h-full w-[2px] rounded-full bg-accent-lime" style={{ animationDelay: '0.15s' }} />
+                  <span className="eq-bar h-full w-[2px] rounded-full bg-accent-lime" style={{ animationDelay: '0.3s' }} />
+                  <span className="eq-bar h-full w-[2px] rounded-full bg-accent-lime" style={{ animationDelay: '0.45s' }} />
+                </span>
+              )}
+            </div>
+            <svg viewBox="0 0 36 36" className="h-8 w-8 shrink-0 -rotate-90">
+              <circle cx="18" cy="18" r={ringRadius} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="3" />
+              <circle
+                cx="18"
+                cy="18"
+                r={ringRadius}
+                fill="none"
+                stroke="var(--accent-lime)"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeDasharray={ringCircumference}
+                strokeDashoffset={ringOffset}
+                style={{ transition: ringJustWrapped ? 'none' : 'stroke-dashoffset 1s linear' }}
+              />
+            </svg>
+          </div>
+          <div className="timer-digit-in mb-2 text-center font-mono text-5xl font-bold tabular-nums sm:text-6xl">
+            {formatHHMMSS(elapsedSeconds)}
+          </div>
+          <p className="mb-6 text-center text-sm text-white/60">Jede Minute zählt.</p>
+          <div className="flex gap-2">
+            {isRunning ? (
+              <Button
+                variant="secondary"
+                fullWidth
+                className="border-white/15 bg-white/10 text-white hover:bg-white/20"
+                onClick={() => pauseTimer()}
+              >
+                Pausieren
+              </Button>
+            ) : (
+              <Button variant="lime" fullWidth onClick={() => resumeTimer()}>
+                Fortsetzen
+              </Button>
             )}
-            <span
-              className={[
-                'relative inline-block h-2 w-2 rounded-full',
-                isRunning ? 'bg-accent-lime' : 'pulse-dot bg-warning',
-              ].join(' ')}
-            />
-          </span>
-          <span className="truncate" title={`${customer?.name ?? '...'} · ${sessionType?.label ?? '...'}`}>
-            {isPaused ? 'Pausiert' : 'Läuft'} · {customer?.name ?? '...'} · {sessionType?.label ?? '...'}
-          </span>
-        </div>
-        <div className="timer-digit-in mb-2 text-center font-mono text-5xl font-bold tabular-nums sm:text-6xl">
-          {formatHHMMSS(elapsedSeconds)}
-        </div>
-        <p className="mb-6 text-center text-sm text-white/60">Jede Minute zählt.</p>
-        <div className="flex gap-2">
-          {isRunning ? (
-            <Button
-              variant="secondary"
-              fullWidth
-              className="border-white/15 bg-white/10 text-white hover:bg-white/20"
-              onClick={() => pauseTimer()}
-            >
-              Pausieren
+            <Button variant="danger" fullWidth onClick={() => stopTimer()}>
+              Stoppen
             </Button>
-          ) : (
-            <Button variant="lime" fullWidth onClick={() => resumeTimer()}>
-              Fortsetzen
-            </Button>
-          )}
-          <Button variant="danger" fullWidth onClick={() => stopTimer()}>
-            Stoppen
-          </Button>
+          </div>
         </div>
       </div>
     );

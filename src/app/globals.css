@@ -104,6 +104,58 @@ button {
   animation: timer-digit-in 350ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both;
 }
 
+@keyframes aurora-drift-a {
+  0%, 100% {
+    transform: translate(-8%, -12%) scale(1);
+  }
+  50% {
+    transform: translate(14%, 6%) scale(1.25);
+  }
+}
+
+@keyframes aurora-drift-b {
+  0%, 100% {
+    transform: translate(10%, 12%) scale(1.1);
+  }
+  50% {
+    transform: translate(-12%, -8%) scale(0.9);
+  }
+}
+
+.aurora-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(38px);
+  pointer-events: none;
+}
+
+.aurora-blob-a {
+  background: radial-gradient(circle, var(--accent-lime) 0%, transparent 70%);
+  opacity: 0.35;
+  animation: aurora-drift-a 11s ease-in-out infinite;
+}
+
+.aurora-blob-b {
+  background: radial-gradient(circle, #4fd1c5 0%, transparent 70%);
+  opacity: 0.22;
+  animation: aurora-drift-b 14s ease-in-out infinite;
+}
+
+@keyframes eq-bar {
+  0%,
+  100% {
+    transform: scaleY(0.25);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.eq-bar {
+  transform-origin: bottom;
+  animation: eq-bar 0.9s ease-in-out infinite;
+}
+
 @keyframes toast-slide-in {
   from {
     transform: translateX(100%);
