@@ -128,7 +128,7 @@ export const TimerWidget = () => {
   if ((isRunning || isPaused) && timerState) {
     const secondsInMinute = elapsedSeconds % 60;
     const ringProgress = secondsInMinute / 60;
-    const ringRadius = 16;
+    const ringRadius = 46;
     const ringCircumference = 2 * Math.PI * ringRadius;
     const ringOffset = ringCircumference * (1 - ringProgress);
     const ringJustWrapped = secondsInMinute === 0;
@@ -142,39 +142,39 @@ export const TimerWidget = () => {
           </>
         )}
         <div className="relative z-10">
-          <div className="mb-6 flex min-w-0 items-center justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white/70">
-              <span className="relative inline-flex h-2 w-2 shrink-0">
-                {isRunning && (
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-lime opacity-75" />
-                )}
-                <span
-                  className={[
-                    'relative inline-block h-2 w-2 rounded-full',
-                    isRunning ? 'bg-accent-lime' : 'pulse-dot bg-warning',
-                  ].join(' ')}
-                />
-              </span>
-              <span
-                className="truncate"
-                title={`${customer?.name ?? '...'} · ${sessionType?.label ?? '...'}`}
-              >
-                {isPaused ? 'Pausiert' : 'Läuft'} · {customer?.name ?? '...'} · {sessionType?.label ?? '...'}
-              </span>
+          <div className="mb-6 flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white/70">
+            <span className="relative inline-flex h-2 w-2 shrink-0">
               {isRunning && (
-                <span className="ml-1 flex h-3 shrink-0 items-end gap-[2px]" aria-hidden>
-                  <span className="eq-bar h-full w-[2px] rounded-full bg-accent-lime" style={{ animationDelay: '0s' }} />
-                  <span className="eq-bar h-full w-[2px] rounded-full bg-accent-lime" style={{ animationDelay: '0.15s' }} />
-                  <span className="eq-bar h-full w-[2px] rounded-full bg-accent-lime" style={{ animationDelay: '0.3s' }} />
-                  <span className="eq-bar h-full w-[2px] rounded-full bg-accent-lime" style={{ animationDelay: '0.45s' }} />
-                </span>
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-lime opacity-75" />
               )}
-            </div>
-            <svg viewBox="0 0 36 36" className="h-8 w-8 shrink-0 -rotate-90">
-              <circle cx="18" cy="18" r={ringRadius} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="3" />
+              <span
+                className={[
+                  'relative inline-block h-2 w-2 rounded-full',
+                  isRunning ? 'bg-accent-lime' : 'pulse-dot bg-warning',
+                ].join(' ')}
+              />
+            </span>
+            <span
+              className="truncate"
+              title={`${customer?.name ?? '...'} · ${sessionType?.label ?? '...'}`}
+            >
+              {isPaused ? 'Pausiert' : 'Läuft'} · {customer?.name ?? '...'} · {sessionType?.label ?? '...'}
+            </span>
+            {isRunning && (
+              <span className="ml-1 flex h-3 shrink-0 items-end gap-[2px]" aria-hidden>
+                <span className="eq-bar h-full w-[2px] rounded-full bg-accent-lime" style={{ animationDelay: '0s' }} />
+                <span className="eq-bar h-full w-[2px] rounded-full bg-accent-lime" style={{ animationDelay: '0.15s' }} />
+                <span className="eq-bar h-full w-[2px] rounded-full bg-accent-lime" style={{ animationDelay: '0.3s' }} />
+                <span className="eq-bar h-full w-[2px] rounded-full bg-accent-lime" style={{ animationDelay: '0.45s' }} />
+              </span>
+            )}
+          </div>
+          <div className="relative mx-auto mb-6 flex h-60 w-60 items-center justify-center sm:h-72 sm:w-72">
+            <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full -rotate-90">
+              <circle cx="50" cy="50" r={ringRadius} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="3" />
               <circle
-                cx="18"
-                cy="18"
+                cx="50"
+                cy="50"
                 r={ringRadius}
                 fill="none"
                 stroke="var(--accent-lime)"
@@ -185,9 +185,9 @@ export const TimerWidget = () => {
                 style={{ transition: ringJustWrapped ? 'none' : 'stroke-dashoffset 1s linear' }}
               />
             </svg>
-          </div>
-          <div className="timer-digit-in mb-2 text-center font-mono text-5xl font-bold tabular-nums sm:text-6xl">
-            {formatHHMMSS(elapsedSeconds)}
+            <div className="timer-digit-in relative z-10 text-center font-mono text-4xl font-bold tabular-nums sm:text-5xl">
+              {formatHHMMSS(elapsedSeconds)}
+            </div>
           </div>
           <p className="mb-6 text-center text-sm text-white/60">Jede Minute zählt.</p>
           <div className="flex gap-2">
