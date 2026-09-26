@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { Logo } from '@/components/nav/Logo';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -50,9 +51,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       <div className="mb-6 flex items-center gap-2.5">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-lg font-bold text-accent-lime">
-          Z
-        </span>
+        <Logo className="h-10 w-10 rounded-xl" />
         <span className="text-2xl font-bold tracking-tight text-text">Zeiterfassung</span>
       </div>
       <form

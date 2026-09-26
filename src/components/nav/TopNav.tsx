@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { SyncStatus } from './SyncStatus';
 import { SyncStatus as SyncStatusType } from '@/types';
+import { Logo } from './Logo';
 import {
   HouseIcon,
   PlusCircleIcon,
@@ -40,9 +41,7 @@ export const TopNav = ({ syncStatus }: TopNavProps) => {
       <div className="mx-auto max-w-5xl px-4 py-4">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent text-base font-bold text-accent-lime">
-              Z
-            </span>
+            <Logo className="h-9 w-9 shrink-0 rounded-xl" />
             <span className="text-lg font-bold tracking-tight text-text">Zeiterfassung</span>
           </div>
           <div className="flex items-center gap-3">
