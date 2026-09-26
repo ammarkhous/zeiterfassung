@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { PeopleIcon, TagIcon } from '@/components/nav/icons';
+import { IconButton } from '@/components/ui/IconButton';
+import { PeopleIcon, TagIcon, PencilIcon, PowerIcon, TrashIcon } from '@/components/nav/icons';
 
 export default function SettingsPage() {
   const { customers, addCustomer, updateCustomer, toggleActive, deleteCustomer } = useCustomers();
@@ -161,33 +162,41 @@ export default function SettingsPage() {
               ) : (
                 <div
                   key={c.id}
-                  className="flex flex-col gap-3 border-b border-border px-4 py-3.5 last:border-b-0 hover:bg-surface-2 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex items-center justify-between gap-3 border-b border-border px-4 py-3.5 last:border-b-0 hover:bg-surface-2"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-text" title={c.name}>
-                      {c.name}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-medium text-text" title={c.name}>
+                        {c.name}
+                      </p>
+                      <Badge variant={c.active ? 'success' : 'default'}>
+                        {c.active ? 'Aktiv' : 'Inaktiv'}
+                      </Badge>
+                    </div>
                     <p className="text-xs text-text-muted">
                       {c.ae_rate.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €/AE
                     </p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={c.active ? 'success' : 'default'}>
-                      {c.active ? 'Aktiv' : 'Inaktiv'}
-                    </Badge>
-                    <Button
-                      size="sm"
-                      variant="secondary"
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <IconButton
+                      label="Bearbeiten"
                       onClick={() => startEditCustomer(c.id, c.name, c.ae_rate)}
                     >
-                      Bearbeiten
-                    </Button>
-                    <Button size="sm" variant="secondary" onClick={() => toggleActive(c.id)}>
-                      {c.active ? 'Deaktivieren' : 'Aktivieren'}
-                    </Button>
-                    <Button size="sm" variant="danger" onClick={() => handleDeleteCustomer(c.id)}>
-                      Löschen
-                    </Button>
+                      <PencilIcon className="h-4 w-4" />
+                    </IconButton>
+                    <IconButton
+                      label={c.active ? 'Deaktivieren' : 'Aktivieren'}
+                      onClick={() => toggleActive(c.id)}
+                    >
+                      <PowerIcon className="h-4 w-4" />
+                    </IconButton>
+                    <IconButton
+                      label="Löschen"
+                      variant="danger"
+                      onClick={() => handleDeleteCustomer(c.id)}
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </IconButton>
                   </div>
                 </div>
               )
@@ -242,18 +251,18 @@ export default function SettingsPage() {
               ) : (
                 <div
                   key={s.id}
-                  className="flex flex-col gap-3 border-b border-border px-4 py-3.5 last:border-b-0 hover:bg-surface-2 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex items-center justify-between gap-3 border-b border-border px-4 py-3.5 last:border-b-0 hover:bg-surface-2"
                 >
                   <p className="min-w-0 flex-1 truncate text-sm font-medium text-text" title={s.label}>
                     {s.label}
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="secondary" onClick={() => startEditType(s.id, s.label)}>
-                      Bearbeiten
-                    </Button>
-                    <Button size="sm" variant="danger" onClick={() => handleDeleteType(s.id)}>
-                      Löschen
-                    </Button>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <IconButton label="Bearbeiten" onClick={() => startEditType(s.id, s.label)}>
+                      <PencilIcon className="h-4 w-4" />
+                    </IconButton>
+                    <IconButton label="Löschen" variant="danger" onClick={() => handleDeleteType(s.id)}>
+                      <TrashIcon className="h-4 w-4" />
+                    </IconButton>
                   </div>
                 </div>
               )
