@@ -121,7 +121,6 @@ const contentTypes =
   '<Default Extension="png" ContentType="image/png"/>' +
   '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
   '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' +
-  '<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>' +
   '<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>' +
   '</Types>';
 
@@ -135,14 +134,8 @@ const documentRels =
   XML +
   '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
   '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
-  '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>' +
   '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>' +
-  '</Relationships>';
-
-const headerRels =
-  XML +
-  '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-  '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/logo.png"/>' +
+  '<Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/logo.png"/>' +
   '</Relationships>';
 
 const styles =
@@ -156,23 +149,23 @@ const styles =
   '</w:styles>';
 
 // Top right, like the letterhead of a German invoice: logo, then the sender details.
-const header =
-  XML +
-  `<w:hdr ${NS}>` +
+// This sits at the top of the document BODY, not in the page header: many viewers (phone
+// apps, previews, Drive) do not draw images from a header, so the logo went missing there.
+// The cost is that it appears on the first page only.
+const letterhead =
   para(
     '<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">' +
       `<wp:extent cx="${LOGO_W}" cy="${LOGO_H}"/><wp:docPr id="1" name="Logo" descr="${COMPANY}"/>` +
       '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
       '<pic:pic><pic:nvPicPr><pic:cNvPr id="1" name="logo.png"/><pic:cNvPicPr/></pic:nvPicPr>' +
-      '<pic:blipFill><a:blip r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>' +
+      '<pic:blipFill><a:blip r:embed="rId4"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>' +
       `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${LOGO_W}" cy="${LOGO_H}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>` +
       '</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>',
     { align: 'right', after: 60 }
   ) +
   para(run(COMPANY, { bold: true, color: NAVY, size: 18 }), { align: 'right' }) +
   para(run(STREET, { color: MUTED, size: 17 }), { align: 'right' }) +
-  para(run(CITY, { color: MUTED, size: 17 }), { align: 'right' }) +
-  '</w:hdr>';
+  para(run(CITY, { color: MUTED, size: 17 }), { align: 'right', after: 360 });
 
 // Word takes a field's formatting from its own runs, so every part carries the same
 // small grey style as the surrounding "Seite ... von ..." text.
@@ -196,13 +189,13 @@ const footer =
   ) +
   '</w:ftr>';
 
-// Body starts 4.5 cm from the top, where the address window of a DIN long envelope sits.
 const sectPr =
-  '<w:sectPr><w:headerReference w:type="default" r:id="rId2"/><w:footerReference w:type="default" r:id="rId3"/>' +
+  '<w:sectPr><w:footerReference w:type="default" r:id="rId3"/>' +
   `<w:pgSz w:w="${PAGE_W}" w:h="16838"/>` +
-  `<w:pgMar w:top="2551" w:right="${MARGIN_R}" w:bottom="1418" w:left="${MARGIN_L}" w:header="454" w:footer="567" w:gutter="0"/></w:sectPr>`;
+  `<w:pgMar w:top="964" w:right="${MARGIN_R}" w:bottom="1418" w:left="${MARGIN_L}" w:header="454" w:footer="567" w:gutter="0"/></w:sectPr>`;
 
-const documentXml = (bodyXml) => XML + `<w:document ${NS}><w:body>${bodyXml}${sectPr}</w:body></w:document>`;
+const documentXml = (bodyXml) =>
+  XML + `<w:document ${NS}><w:body>${letterhead}${bodyXml}${sectPr}</w:body></w:document>`;
 
 // --- invoice building blocks -------------------------------------------------
 
@@ -474,10 +467,8 @@ const build = async (fileName, bodyXml) => {
   zip.file('_rels/.rels', rootRels);
   zip.file('word/document.xml', documentXml(bodyXml));
   zip.file('word/styles.xml', styles);
-  zip.file('word/header1.xml', header);
   zip.file('word/footer1.xml', footer);
   zip.file('word/_rels/document.xml.rels', documentRels);
-  zip.file('word/_rels/header1.xml.rels', headerRels);
   zip.file('word/media/logo.png', fs.readFileSync(LOGO_PATH));
   const bytes = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
   fs.mkdirSync(OUT_DIR, { recursive: true });
