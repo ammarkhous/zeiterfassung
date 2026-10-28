@@ -62,10 +62,10 @@ zurückgesetzt und ein Hinweis angezeigt. Netzwerk-/Auth-Fehler bleiben in der Q
 wiederholt. `drainSyncQueue` läuft nie parallel. Beim Zurückkehren ins Fenster wird (max. 1×/Minute)
 neu synchronisiert, damit geteilte Kunden/Typen anderer Benutzer ankommen.
 
-IndexedDB-Datenbank: `zeiterfassung-db-<userId>` (Version 1), **eine pro Benutzer**, gesetzt über
+IndexedDB-Datenbank: `zeiterfassung-db-<userId>` (Version 2), **eine pro Benutzer**, gesetzt über
 `setDbUser()` in `src/lib/db.ts` bevor ein Hook die DB anfasst (`(app)/layout.tsx`). Stores
 `customers`, `session_types`, `time_entries` (Indizes: `by-date`, `by-customer`), `sync_queue`
-(Index: `by-timestamp`), `timer_state`. Die alte gemeinsame `zeiterfassung-db` wird nicht mehr benutzt.
+(Index: `by-timestamp`), `timer_state`, `report_templates` (seit Version 2). Die alte gemeinsame `zeiterfassung-db` wird nicht mehr benutzt.
 
 ## Mehrbenutzer & Administration
 
@@ -110,11 +110,80 @@ sonst würde ein Wischer über den Rand die Unterschrift verwerfen.
 - **Speicherung:** Spalten `technician_signature`, `customer_signature` (PNG-Data-URL, 480×160, 3:1,
   transparent) und `signed_at` an `time_entries`; Check-Constraint: PNG-Data-URL, max. 100000 Zeichen.
   Sync unverändert (`updateEntry` → `writeWithSync`), keine IndexedDB-Versionsänderung.
-- **PDF:** `src/lib/pdf.ts` (`buildReportPdf`). Signierte Sessions bekommen in derselben Tabellenzeile
-  unter der Notiz einen Unterschriftenbereich („Techniker“, „Kunde“, „keine Unterschrift“, Datum), die
-  Zeile wird nie über einen Seitenumbruch geteilt. CSV/TXT/Mail enthalten keine Unterschriften.
+- **PDF:** Unterschriften erscheinen **nur im Einzel-Session-Bericht** (`buildSessionPdf` in
+  `src/lib/pdf.ts`): Detailtabelle, vollständige Notizen (lange Notizen laufen auf Folgeseiten weiter) und
+  ein Unterschriftenblock mit zwei Feldern („Techniker: <Name>“, „Kunde: <Name>“, Datum, oder „Nicht
+  unterschrieben“). Der Monatsbericht für alle Arbeit und der Monatsbericht pro Kunde enthalten keine
+  Unterschriften; `buildReportPdf(..., { includeSignatures: true })` würde sie in der Tabelle drucken
+  (Standard: aus). CSV/TXT/Mail enthalten keine Unterschriften.
 - **Größe:** `select('*')` lädt die Bilder bei jedem Pull mit. Bei sehr vielen signierten Sessions wäre
   ein inkrementeller Pull (`updated_at`) oder Supabase Storage die Lösung.
+
+## Reports
+
+Die Seite **Reports** (`/report`, früher „Monatsreport“) hat zwei Tabs. **Alle Arbeit:** Monat wählen,
+Bericht über alle Kunden (`AllWorkReport`), Export als PDF/CSV/TXT, `Abrechnung_YYYY-MM.*`. **Pro Kunde:**
+Kunde anklicken, Monat wählen (`CustomerReports`), dann Monatszusammenfassung mit Export aller Sessions
+des Kunden (`Abrechnung_<Kunde>_YYYY-MM.*`) und darunter jede Session einzeln mit eigenem Export
+(`SessionExportButtons`: PDF mit Unterschriften, CSV, TXT; `Session_<Kunde>_<Datum>_<HHmm>.*`). Alle
+Formate teilen sich die Builder in `src/lib/export.ts` (`buildReportCsv`, `buildReportTxt`,
+`buildSessionTxt`) und `src/lib/reportRows.ts` (`buildMonthlyRows`, `buildSessionRow`), damit die Zahlen
+überall identisch sind.
+
+## Material und Fahrt
+
+Auf der Abschlusskarte einer Timer-Session (Notizfeld, „Speichern“) lassen sich optional **Material**
+(Bezeichnung + Menge als Freitext, max. 20 Zeilen) und eine **Fahrt in km** erfassen
+(`MaterialFahrtFields`, Hilfsfunktionen in `src/lib/materials.ts`). Beides ist nur zur Dokumentation:
+**keine Preise**, keine Auswirkung auf Summen (km werden nur zur Information addiert). Nur dort erfassbar,
+nicht in „Neue Erfassung“ und nicht nachträglich änderbar (das Bearbeiten-Formular lässt die Felder
+unberührt). Der Entwurf wird wie die Notiz nicht über einen Reload gerettet.
+
+- **Daten:** `time_entries.materials` (jsonb, `[{name, menge}]`, Standard `[]`) und `travel_km`
+  (numeric(7,1), 0–9999,9), beides per Check-Constraint abgesichert; der Eintrag wird als Ganzes synchronisiert.
+- **Anzeige:** Übersicht im Unterschriften-Dialog, graue Zeilen in Sessions-Tabelle, „Heutige Sessions“ und in
+  der Kundenliste der Reports (Monatssumme der Kilometer).
+- **Exporte:** CSV hängt die Spalten `Fahrt_km` und `Material` hinten an; TXT (Monat und Session) und die
+  Session-Mail enthalten Material-/Fahrt-Zeilen; Standard-PDF Monat: Zeilen in der Notizen-Zelle plus „Gefahrene
+  Kilometer“ pro Kunde; Standard-PDF Session: Zeile „Fahrt“ und Tabelle „Verwendetes Material“. Word-Vorlagen
+  bekommen `fahrt`, `material`, `materialien`, `hat_fahrt`, `hat_material`, `km_gesamt`, `$k.km`, `$s.material`,
+  `$s.fahrt` (siehe Admin-Tab).
+
+## Word-Vorlagen für Exporte
+
+Im Admin-Tab („Export-Vorlagen (Word)“) lädt der Administrator pro Berichtsart eine `.docx`-Vorlage hoch:
+**monthly** (Alle Arbeit und Monatsexport pro Kunde) und **session** (einzelne Session). Mit Vorlage
+heißt der erste Export-Button „Word exportieren“ (Zeilen: „Word“) und liefert eine `.docx` im Design der
+Vorlage statt des Standard-PDFs; ohne Vorlage bleibt das PDF wie bisher. CSV/TXT nutzen nie eine Vorlage.
+Schlägt das Befüllen fehl, wird automatisch das Standard-PDF erstellt (mit Hinweis). Ein Template kann
+nicht in ein PDF umgewandelt werden (das bräuchte einen Server).
+
+- **Engine:** `docx-templates` (MIT), die vorgefertigte Browser-Bundle `docx-templates/lib/browser.js`
+  wird erst beim Export per dynamischem `import()` geladen. Befehle: `{feld}`, `{$schleifenvar.feld}`,
+  `{FOR x IN pfad}…{END-FOR x}`, `{IF pfad}…{END-IF}`, `{IMAGE pfad}`. Eine Tabellenzeile pro Session:
+  `FOR` in einer eigenen Zeile über, `END-FOR` in einer eigenen Zeile unter der sich wiederholenden Zeile
+  (beides in derselben Zeile würde die Zellen nebeneinander wiederholen).
+- **KEINE PREISE in Word-Exporten:** Ein Word-Export ist ein Technikerbericht, keine Rechnung. Preise,
+  AE-Sätze und Beträge werden den Vorlagen gar nicht erst übergeben (`src/lib/templateData.ts`, `TEMPLATE_ROOTS`
+  enthält kein Preisfeld), eine Vorlage mit `{wert}`, `{satz}`, `{wert_gesamt}` o. Ä. wird vom Validator
+  abgelehnt. Das Portal (Reports, Dashboard) sowie Standard-PDF, CSV und TXT zeigen weiterhin Preise.
+- **SICHERHEIT:** Template-Befehle sind JavaScript und würden im Browser **jedes** Benutzers laufen.
+  `validateTemplate()` (`src/lib/docxTemplate.ts`) erlaubt deshalb ausschließlich Feldzugriffe auf die
+  bekannten Datenfelder (`TEMPLATE_ROOTS` in `src/lib/templateData.ts`), Schleifen, `IF` und `IMAGE`: keine
+  Funktionsaufrufe, Operatoren, `EXEC`/`HTML`/`LINK`/`QUERY`, keine Makros. Geprüft wird beim Upload **und**
+  vor jedem Export; beim Upload zusätzlich ein Probelauf mit Beispieldaten. Wer neue Felder ergänzt, muss
+  `TEMPLATE_ROOTS` und die Builder gemeinsam ändern.
+- **Speicherung:** Tabelle `report_templates` (Base64, max. ca. 2 MB Datei; nur Admins schreiben, alle aktiven
+  Benutzer lesen). Lokale Kopie im IndexedDB-Store `report_templates` (DB-Version 2), damit Exporte offline
+  funktionieren. `pullTemplates()` (bei Start und Fensterfokus) lädt nur Metadaten und den Inhalt nur bei
+  geändertem `updated_at`.
+- **Daten für Vorlagen:** `src/lib/templateData.ts` (`buildMonthlyTemplateData`, `buildSessionTemplateData`).
+  Berichtsnummer wird aus Datum/Kunde abgeleitet (z. B. `TB-2026-10-IFG`, `TB-20261028-1757`); die App hat
+  keinen Zähler, keine Kundenadresse, keinen Steuersatz und keine Bankdaten.
+- **Mitgelieferte Vorlagen:** `scripts/generate-sample-templates.js` erzeugt
+  `public/templates/MCT_Vorlage_Monatsbericht.docx` und `MCT_Vorlage_Session-Bericht.docx` im Stil einer
+  deutschen Rechnung („Technikerbericht“, Logo oben rechts, Absenderzeile, Infoblock, Positionstabelle,
+  Summen, Grußformel, Fußzeile mit Adresse). Logo: `scripts/assets/mct-logo.png`.
 
 ## Export & Versand
 
@@ -147,9 +216,10 @@ src/
     nav/       TopNav.tsx, SyncStatus.tsx, Logo.tsx, UpdatePrompt.tsx, icons.tsx
     timer/     TimerWidget.tsx, TimerCard.tsx
     entry/     AEInput.tsx, EntryForm.tsx
-    report/    ReportTable.tsx, ExportButtons.tsx
+    report/    ReportTable.tsx, ExportButtons.tsx, SessionExportButtons.tsx, AllWorkReport.tsx, CustomerReports.tsx
+    signature/ SignaturePad.tsx, SignatureModal.tsx
     ui/        Button.tsx, Input.tsx, Select.tsx, Modal.tsx, Badge.tsx, Toast.tsx, IconButton.tsx, ...
-  lib/         supabase.ts, db.ts, ae.ts, sync.ts, export.ts, mail.ts, auth.ts, adminApi.ts, translate.ts
+  lib/         supabase.ts, db.ts, ae.ts, sync.ts, export.ts, pdf.ts, reportRows.ts, mail.ts, auth.ts, adminApi.ts, translate.ts
   hooks/       useCustomers.ts, useSessionTypes.ts, useTimeEntries.ts, useTimers.ts, useSync.ts,
                useOnlineStatus.ts, useProfile.tsx
   types/       index.ts

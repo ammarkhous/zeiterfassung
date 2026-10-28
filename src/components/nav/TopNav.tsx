@@ -21,7 +21,7 @@ const navItems = [
   { label: 'Dashboard', href: '/', icon: HouseIcon },
   { label: 'Neue Erfassung', href: '/new-entry', icon: PlusCircleIcon },
   { label: 'Sessions', href: '/sessions', icon: ListIcon },
-  { label: 'Monatsreport', href: '/report', icon: BarChartIcon },
+  { label: 'Reports', href: '/report', icon: BarChartIcon },
   { label: 'Einstellungen', href: '/settings', icon: GearIcon },
 ];
 

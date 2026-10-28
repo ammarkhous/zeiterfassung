@@ -61,7 +61,15 @@ create table time_entries (
       or (technician_signature like 'data:image/png;base64,%' and length(technician_signature) <= 100000)),
   constraint time_entries_customer_signature_check
     check (customer_signature is null
-      or (customer_signature like 'data:image/png;base64,%' and length(customer_signature) <= 100000))
+      or (customer_signature like 'data:image/png;base64,%' and length(customer_signature) <= 100000)),
+  -- Material delivered or used on site, as [{"name": "...", "menge": "..."}] (Menge is free
+  -- text), and kilometers driven. Informational only: no prices, no effect on any total.
+  materials jsonb not null default '[]'::jsonb,
+  travel_km numeric(7,1),
+  constraint time_entries_materials_check
+    check (case when jsonb_typeof(materials) = 'array' then jsonb_array_length(materials) <= 20 else false end),
+  constraint time_entries_travel_km_check
+    check (travel_km is null or (travel_km >= 0 and travel_km <= 9999.9))
 );
 
 create index time_entries_user_id_idx on time_entries (user_id);
@@ -138,6 +146,27 @@ create policy "session_types update" on session_types
 create policy "session_types delete" on session_types
   for delete to authenticated using (is_admin());
 
+-- One admin-uploaded Word template per report type, shared by all users. content is the
+-- base64 of the .docx (max about 2 MB of file). Only admins may write; all active users read.
+create table report_templates (
+  kind text primary key check (kind in ('monthly', 'session')),
+  file_name text not null,
+  content text not null check (length(content) <= 3000000),
+  uploaded_by uuid references auth.users(id) on delete set null default auth.uid(),
+  updated_at timestamptz not null default now()
+);
+
+alter table report_templates enable row level security;
+
+create policy "report_templates select" on report_templates
+  for select to authenticated using (is_active_user());
+create policy "report_templates insert" on report_templates
+  for insert to authenticated with check (is_admin());
+create policy "report_templates update" on report_templates
+  for update to authenticated using (is_admin()) with check (is_admin());
+create policy "report_templates delete" on report_templates
+  for delete to authenticated using (is_admin());
+
 create or replace function update_updated_at()
 returns trigger as $$
 begin
@@ -149,6 +178,7 @@ set search_path = public;
 
 create trigger customers_updated_at before update on customers for each row execute function update_updated_at();
 create trigger time_entries_updated_at before update on time_entries for each row execute function update_updated_at();
+create trigger report_templates_updated_at before update on report_templates for each row execute function update_updated_at();
 
 -- First admin: create the user in Supabase Auth (dashboard), then run
 --   insert into profiles (id, role) values ('<auth user id>', 'admin');

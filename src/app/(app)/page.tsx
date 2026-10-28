@@ -15,6 +15,7 @@ import { useSessionTypes } from '@/hooks/useSessionTypes';
 import { useTimeEntries } from '@/hooks/useTimeEntries';
 import { formatAE, minutesToHHMM, minutesToAE } from '@/lib/ae';
 import { sendSessionByMail } from '@/lib/mail';
+import { materialAndTravelLines } from '@/lib/materials';
 import { TimeEntry } from '@/types';
 
 const formatEUR = (value: number): string =>
@@ -127,7 +128,7 @@ export default function DashboardPage() {
           href="/report"
           className="flex items-center justify-between text-sm font-semibold text-accent hover:underline"
         >
-          Abrechnung erstellen
+          Reports öffnen
           <span aria-hidden>→</span>
         </Link>
       </div>
@@ -183,6 +184,11 @@ export default function DashboardPage() {
                       {entry.notes.slice(0, 60)}
                     </p>
                   )}
+                  {materialAndTravelLines(entry).map((line) => (
+                    <p key={line} className="truncate text-xs text-text-muted" title={line}>
+                      {line}
+                    </p>
+                  ))}
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="text-sm font-bold text-text">

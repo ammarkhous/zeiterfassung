@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useSessionTypes } from '@/hooks/useSessionTypes';
-import { useTimers } from '@/hooks/useTimers';
+import { SessionExtras, useTimers } from '@/hooks/useTimers';
 import { useTimeEntries } from '@/hooks/useTimeEntries';
 import { useProfile } from '@/hooks/useProfile';
 import { Select } from '@/components/ui/Select';
@@ -41,8 +41,8 @@ export const TimerWidget = () => {
     setSessionTypeId('');
   };
 
-  const handleSave = async (key: string, minutes: number, notes: string) => {
-    const entry = await saveSession(key, minutes, notes);
+  const handleSave = async (key: string, minutes: number, notes: string, extras: SessionExtras) => {
+    const entry = await saveSession(key, minutes, notes, extras);
     if (entry) setSigningEntry(entry);
   };
 
@@ -72,7 +72,7 @@ export const TimerWidget = () => {
           onPause={() => pauseTimer(timer.key)}
           onResume={() => resumeTimer(timer.key)}
           onStop={() => stopTimer(timer.key)}
-          onSave={(minutes, notes) => handleSave(timer.key, minutes, notes)}
+          onSave={(minutes, notes, extras) => handleSave(timer.key, minutes, notes, extras)}
           onDiscard={() => discardSession(timer.key)}
         />
       ))}

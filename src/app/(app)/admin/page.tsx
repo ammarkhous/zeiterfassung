@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { IconButton } from '@/components/ui/IconButton';
+import { TemplateSettings } from '@/components/admin/TemplateSettings';
 import { KeyIcon, PeopleIcon, PowerIcon, ShieldIcon, TrashIcon } from '@/components/nav/icons';
 import { AdminUser, UserRole } from '@/types';
 
@@ -249,6 +250,8 @@ export default function AdminPage() {
           </div>
         )}
       </section>
+
+      <TemplateSettings />
 
       <Modal
         open={!!passwordTarget}

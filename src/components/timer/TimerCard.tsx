@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
-import { TimerView } from '@/hooks/useTimers';
+import { SessionExtras, TimerView } from '@/hooks/useTimers';
+import { DraftMaterial, MaterialFahrtFields } from '@/components/entry/MaterialFahrtFields';
+import { normalizeMaterials, parseKm } from '@/lib/materials';
 import { minutesToAE, minutesToHHMM } from '@/lib/ae';
 import { translateToGerman } from '@/lib/translate';
 
@@ -21,7 +23,7 @@ interface TimerCardProps {
   onPause: () => void | Promise<void>;
   onResume: () => void | Promise<void>;
   onStop: () => void | Promise<unknown>;
-  onSave: (minutes: number, notes: string) => Promise<void>;
+  onSave: (minutes: number, notes: string, extras: SessionExtras) => Promise<void>;
   onDiscard: () => Promise<void>;
 }
 
@@ -39,6 +41,10 @@ export const TimerCard = ({
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [translating, setTranslating] = useState(false);
+  // Optional on-site extras; like the note, only kept while this card is open.
+  const [materials, setMaterials] = useState<DraftMaterial[]>([]);
+  const [kmText, setKmText] = useState('');
+  const [kmError, setKmError] = useState<string | undefined>();
 
   const isRunning = timer.status === 'running';
   const isPaused = timer.status === 'paused';
@@ -64,9 +70,19 @@ export const TimerCard = ({
   };
 
   const handleSave = async () => {
+    const km = parseKm(kmText);
+    if (!km.ok) {
+      setKmError(km.error);
+      return;
+    }
+    setKmError(undefined);
+
     setSaving(true);
     const finalNotes = await translateNotesIfNeeded(notes);
-    await onSave(timer.frozen_minutes ?? 1, finalNotes);
+    await onSave(timer.frozen_minutes ?? 1, finalNotes, {
+      materials: normalizeMaterials(materials),
+      travel_km: km.km,
+    });
     setSaving(false);
     showToast('Session gespeichert', 'success');
   };
@@ -107,6 +123,17 @@ export const TimerCard = ({
             <p className="mt-1 text-xs text-text-muted">Übersetzung wird geprüft...</p>
           )}
         </div>
+        <MaterialFahrtFields
+          materials={materials}
+          onMaterialsChange={setMaterials}
+          kmText={kmText}
+          onKmTextChange={(text) => {
+            setKmText(text);
+            setKmError(undefined);
+          }}
+          kmError={kmError}
+          disabled={saving}
+        />
         <div className="flex gap-2">
           <Button onClick={handleSave} disabled={saving}>
             Speichern

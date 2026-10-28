@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getDB } from '@/lib/db';
-import { TimeEntry, TimerState } from '@/types';
+import { MaterialItem, TimeEntry, TimerState } from '@/types';
+
+// Optional on-site extras entered on the finish card (no prices).
+export interface SessionExtras {
+  materials?: MaterialItem[];
+  travel_km?: number | null;
+}
 import { useTimeEntries } from './useTimeEntries';
 
 const localDateString = (d: Date): string => {
@@ -136,7 +142,12 @@ export const useTimers = () => {
 
   const saveSession = useCallback(
     // Returns the saved entry so the caller can continue with it (signatures).
-    async (key: string, duration_minutes: number, notes: string): Promise<TimeEntry | null> => {
+    async (
+      key: string,
+      duration_minutes: number,
+      notes: string,
+      extras: SessionExtras = {}
+    ): Promise<TimeEntry | null> => {
       const timer = timersRef.current.find((t) => t.key === key);
       if (!timer) return null;
       const entry = await addEntry({
@@ -147,6 +158,8 @@ export const useTimers = () => {
         entry_date: localDateString(new Date()),
         started_at: timer.created_at ?? timer.started_at,
         ended_at: new Date().toISOString(),
+        materials: extras.materials,
+        travel_km: extras.travel_km,
       });
       await remove(key);
       return entry;

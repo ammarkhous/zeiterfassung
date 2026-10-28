@@ -13,6 +13,13 @@ export interface SessionType {
   created_at: string;
 }
 
+// One line of material delivered or used on site. Menge is free text ("2 Stück",
+// "5 m"): there are no prices or sums, so there is nothing to compute with it.
+export interface MaterialItem {
+  name: string;
+  menge: string;
+}
+
 export interface TimeEntry {
   id: string;
   customer_id: string;
@@ -30,6 +37,10 @@ export interface TimeEntry {
   technician_signature?: string | null;
   customer_signature?: string | null;
   signed_at?: string | null;
+  /** Material delivered or used on site; entered on the finish card of a timer session. */
+  materials?: MaterialItem[];
+  /** Kilometers driven to the customer; informational only (no price). */
+  travel_km?: number | null;
 }
 
 export interface SyncQueueItem {
@@ -54,6 +65,19 @@ export interface TimerState {
   /** Rounded minutes frozen by "Stoppen", waiting to be saved or discarded. */
   frozen_minutes?: number;
 }
+
+// monthly: "Alle Arbeit" and per-customer month reports; session: single-session report.
+export type ReportTemplateKind = 'monthly' | 'session';
+
+export interface StoredTemplate {
+  kind: ReportTemplateKind;
+  file_name: string;
+  /** The .docx, base64 encoded. */
+  content: string;
+  updated_at: string;
+}
+
+export type TemplateMeta = Pick<StoredTemplate, 'kind' | 'file_name' | 'updated_at'>;
 
 export type UserRole = 'admin' | 'user';
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { drainSyncQueue, pullFromSupabase } from '@/lib/sync';
+import { pullTemplates } from '@/lib/templates';
 import { getDB } from '@/lib/db';
 import { SyncStatus } from '@/types';
 import { useOnlineStatus } from './useOnlineStatus';
@@ -34,6 +35,9 @@ export const useSync = () => {
     setSyncStatus('syncing');
     try {
       await pullFromSupabase();
+      // The shared Word templates are small metadata checks; a failure here must
+      // never turn the sync status red.
+      await pullTemplates().catch((err) => console.error('Vorlagen-Sync fehlgeschlagen:', err));
       const success = await drainSyncQueue();
       const queueEmpty = await checkQueueEmpty();
       if (success && queueEmpty) {

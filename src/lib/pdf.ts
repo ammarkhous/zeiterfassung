@@ -1,9 +1,10 @@
 import jsPDF from 'jspdf';
 import autoTable, { CellDef, CellHookData } from 'jspdf-autotable';
-import { MonthlyReportRow } from '@/types';
+import { Customer, MonthlyReportRow, TimeEntry } from '@/types';
 import { minutesToAE, minutesToHHMM } from '@/lib/ae';
 import { GERMAN_MONTHS } from '@/lib/germanMonths';
 import { formatDateDDMMYYYY, formatEUR } from '@/lib/export';
+import { formatKm, hasMaterials, hasTravel, materialAndTravelLines, sumKm } from '@/lib/materials';
 
 const ACCENT: [number, number, number] = [31, 58, 46]; // #1F3A2E
 const LIME: [number, number, number] = [169, 217, 119]; // #A9D977
@@ -38,6 +39,67 @@ type SignedNotesCell = CellDef & { signatures: SignatureCellData };
 
 const lastTableBottom = (doc: jsPDF): number =>
   (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+
+// Same green header band for every report. `full` is the big first-page header,
+// otherwise the slim running header for continuation pages.
+const drawReportHeader = (
+  doc: jsPDF,
+  options: { full: boolean; heading: string; runningTitle: string; createdDate: string }
+): void => {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const { full } = options;
+
+  doc.setFillColor(...ACCENT);
+  doc.rect(0, 0, pageWidth, full ? 38 : 20, 'F');
+
+  doc.setFillColor(...LIME);
+  doc.roundedRect(14, full ? 10 : 5, 10, 10, 2.5, 2.5, 'F');
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...ACCENT);
+  doc.text('Z', 19, full ? 17.2 : 12.2, { align: 'center' });
+
+  if (!full) {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text(options.runningTitle, 28, 11.5);
+    return;
+  }
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(255, 255, 255);
+  doc.text('ZEITERFASSUNG', 28, 14);
+
+  doc.setFontSize(17);
+  doc.setFont('helvetica', 'bold');
+  doc.text(options.heading, 28, 23);
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(220, 226, 218);
+  doc.text(`Erstellt am ${options.createdDate}`, 28, 30);
+
+  doc.setFontSize(8);
+  doc.setTextColor(...LIME);
+  doc.text('DE · DEUTSCHES PDF', pageWidth - 14, 14, { align: 'right' });
+};
+
+const drawFooters = (doc: jsPDF): void => {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setDrawColor(...BORDER);
+    doc.line(14, 285, pageWidth - 14, 285);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...TEXT_MUTED);
+    doc.text('Zeiterfassung', 14, 291);
+    doc.text(`Seite ${i} von ${pageCount}`, pageWidth - 14, 291, { align: 'right' });
+  }
+};
 
 // Draws one party's signature (or a note that there is none) into the notes cell.
 const drawSignature = (
@@ -88,13 +150,21 @@ const drawSignatureArea = (doc: jsPDF, data: CellHookData, signatures: Signature
   }
 };
 
+export interface ReportPdfOptions {
+  // Prints each signed session's signatures inside the monthly table. Off by
+  // default: signatures belong on single-session reports (buildSessionPdf).
+  includeSignatures?: boolean;
+}
+
 export const buildReportPdf = (
   rows: MonthlyReportRow[],
   year: number,
   month: number,
   sessionTypeLabel: (id: string) => string,
-  noteFor: (notes: string | null) => string
+  noteFor: (notes: string | null) => string,
+  options: ReportPdfOptions = {}
 ): jsPDF => {
+  const { includeSignatures = false } = options;
   const monthLabel = GERMAN_MONTHS[month];
   // compress: signature images would otherwise be embedded as raw pixels (MBs).
   const doc = new jsPDF({ compress: true });
@@ -104,43 +174,13 @@ export const buildReportPdf = (
   const totalAE = minutesToAE(rows.reduce((s, r) => s + r.total_minutes, 0));
   const totalValue = rows.reduce((s, r) => s + r.total_value, 0);
 
-  const drawHeader = (full: boolean) => {
-    doc.setFillColor(...ACCENT);
-    doc.rect(0, 0, pageWidth, full ? 38 : 20, 'F');
-
-    doc.setFillColor(...LIME);
-    doc.roundedRect(14, full ? 10 : 5, 10, 10, 2.5, 2.5, 'F');
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...ACCENT);
-    doc.text('Z', 19, full ? 17.2 : 12.2, { align: 'center' });
-
-    if (!full) {
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(255, 255, 255);
-      doc.text(`Zeiterfassung · ${monthLabel} ${year}`, 28, 11.5);
-      return;
-    }
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(255, 255, 255);
-    doc.text('ZEITERFASSUNG', 28, 14);
-
-    doc.setFontSize(17);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Abrechnung ${monthLabel} ${year}`, 28, 23);
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(220, 226, 218);
-    doc.text(`Erstellt am ${createdDate}`, 28, 30);
-
-    doc.setFontSize(8);
-    doc.setTextColor(...LIME);
-    doc.text('DE · DEUTSCHES PDF', pageWidth - 14, 14, { align: 'right' });
-  };
+  const drawHeader = (full: boolean) =>
+    drawReportHeader(doc, {
+      full,
+      heading: `Abrechnung ${monthLabel} ${year}`,
+      runningTitle: `Zeiterfassung · ${monthLabel} ${year}`,
+      createdDate,
+    });
 
   drawHeader(true);
 
@@ -226,13 +266,15 @@ export const buildReportPdf = (
       startY: finalY + 4,
       head: [['Datum', 'Typ', 'AE', 'hh:mm', 'Notizen']],
       body: row.entries.map((e) => {
-        const note = noteFor(e.notes);
+        // Material and Fahrt go on extra lines inside the same cell, so the row stays one
+        // row and a page break can never separate them from their session.
+        const note = [noteFor(e.notes), ...materialAndTravelLines(e)].filter(Boolean).join('\n');
         let notesCell: string | SignedNotesCell = note;
 
         // A signed session keeps its signatures in the same table row (one row can
         // never be split across a page), so the row is made tall enough for the
         // note text plus the signature area underneath it.
-        if (e.technician_signature || e.customer_signature) {
+        if (includeSignatures && (e.technician_signature || e.customer_signature)) {
           const noteLines = note ? doc.splitTextToSize(note, notesTextWidth).length : 0;
           notesCell = {
             content: note,
@@ -285,19 +327,198 @@ export const buildReportPdf = (
     });
 
     finalY = lastTableBottom(doc) + 14;
+
+    const km = sumKm(row.entries);
+    if (km > 0) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(...TEXT_MUTED);
+      doc.text(`Gefahrene Kilometer: ${formatKm(km)}`, pageWidth - PAGE_MARGIN, lastTableBottom(doc) + 5, {
+        align: 'right',
+      });
+      finalY += 4;
+    }
   }
 
-  const pageCount = doc.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    doc.setDrawColor(...BORDER);
-    doc.line(14, 285, pageWidth - 14, 285);
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...TEXT_MUTED);
-    doc.text('Zeiterfassung', 14, 291);
-    doc.text(`Seite ${i} von ${pageCount}`, pageWidth - 14, 291, { align: 'right' });
+  drawFooters(doc);
+  return doc;
+};
+
+// --- Single-session report ------------------------------------------------
+
+const SESSION_BOX_HEIGHT = 34;
+const SESSION_BLOCK_HEIGHT = 6 + SESSION_BOX_HEIGHT + 9;
+const SESSION_IMAGE_WIDTH = 72;
+const SESSION_IMAGE_HEIGHT = SESSION_IMAGE_WIDTH / 3;
+const CONTENT_BOTTOM = 275;
+
+const formatClock = (iso: string): string =>
+  new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+
+// One party's labelled signature box: the image, or "Nicht unterschrieben".
+const drawSessionSignatureBox = (
+  doc: jsPDF,
+  label: string,
+  dataUrl: string | null | undefined,
+  signedAt: string | null | undefined,
+  x: number,
+  y: number,
+  width: number
+): void => {
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(...TEXT);
+  doc.text(label, x, y + 3.5, { maxWidth: width });
+
+  const boxY = y + 6;
+  doc.setDrawColor(...BORDER);
+  doc.setFillColor(255, 255, 255);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(x, boxY, width, SESSION_BOX_HEIGHT, 2.5, 2.5, 'FD');
+
+  let drawn = false;
+  if (dataUrl) {
+    try {
+      doc.addImage(
+        dataUrl,
+        'PNG',
+        x + (width - SESSION_IMAGE_WIDTH) / 2,
+        boxY + (SESSION_BOX_HEIGHT - SESSION_IMAGE_HEIGHT) / 2,
+        SESSION_IMAGE_WIDTH,
+        SESSION_IMAGE_HEIGHT
+      );
+      drawn = true;
+    } catch {
+      // A damaged image must never break the whole export.
+    }
   }
 
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...TEXT_MUTED);
+  if (!drawn) {
+    doc.text(dataUrl ? 'Unterschrift nicht lesbar' : 'Nicht unterschrieben', x + width / 2, boxY + SESSION_BOX_HEIGHT / 2 + 1, {
+      align: 'center',
+    });
+  } else if (signedAt) {
+    doc.text(
+      `Unterschrieben am ${new Date(signedAt).toLocaleDateString('de-DE')}`,
+      x,
+      boxY + SESSION_BOX_HEIGHT + 5
+    );
+  }
+};
+
+// A work report for one session, meant to be handed to the customer: details,
+// the complete notes (long notes continue on the next page) and the signature
+// block with both signatures, or "Nicht unterschrieben" where one is missing.
+// No prices: this is a record of the work, not a bill.
+export const buildSessionPdf = (
+  entry: TimeEntry,
+  customer: Customer,
+  sessionTypeLabel: string,
+  technicianName: string,
+  noteText: string
+): jsPDF => {
+  const doc = new jsPDF({ compress: true });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const contentWidth = pageWidth - 2 * PAGE_MARGIN;
+  const createdDate = new Date().toLocaleDateString('de-DE');
+  const date = formatDateDDMMYYYY(entry.entry_date);
+
+  const header = {
+    heading: 'Session-Bericht',
+    runningTitle: `Zeiterfassung · Session-Bericht · ${customer.name}`,
+    createdDate,
+  };
+  drawReportHeader(doc, { ...header, full: true });
+
+  const details: [string, string][] = [
+    ['Kunde', customer.name],
+    ['Datum', date],
+  ];
+  if (entry.started_at && entry.ended_at) {
+    details.push(['Beginn / Ende', `${formatClock(entry.started_at)} – ${formatClock(entry.ended_at)} Uhr`]);
+  }
+  details.push(
+    ['Session-Typ', sessionTypeLabel],
+    ['Dauer', `${minutesToAE(entry.duration_minutes).toFixed(1)} AE (${minutesToHHMM(entry.duration_minutes)})`]
+  );
+  if (hasTravel(entry)) details.push(['Fahrt', formatKm(entry.travel_km as number)]);
+  details.push(['Techniker', technicianName]);
+
+  const continuationMargin = { top: 26, left: PAGE_MARGIN, right: PAGE_MARGIN };
+  // Slim running header on pages autoTable adds for long notes.
+  const didDrawPage = (data: { pageNumber: number }) => {
+    if (data.pageNumber > 1) drawReportHeader(doc, { ...header, full: false });
+  };
+
+  autoTable(doc, {
+    startY: 46,
+    body: details,
+    theme: 'grid',
+    styles: { fontSize: 10, textColor: TEXT, lineColor: BORDER, lineWidth: 0.2, cellPadding: 3.5 },
+    columnStyles: {
+      0: { cellWidth: 40, fontStyle: 'bold', fillColor: SURFACE_2 },
+    },
+    margin: continuationMargin,
+    didDrawPage,
+  });
+
+  autoTable(doc, {
+    startY: lastTableBottom(doc) + 8,
+    head: [['Notizen / Beschreibung']],
+    body: [[noteText.trim() ? noteText : 'Keine Notizen']],
+    theme: 'grid',
+    headStyles: { fillColor: SURFACE_2, textColor: TEXT, fontStyle: 'bold' },
+    styles: { fontSize: 10, textColor: TEXT, lineColor: BORDER, lineWidth: 0.2, cellPadding: 3.5 },
+    margin: continuationMargin,
+    didDrawPage,
+  });
+
+  // Material delivered or used on site: name and Menge, no prices.
+  if (hasMaterials(entry)) {
+    autoTable(doc, {
+      startY: lastTableBottom(doc) + 8,
+      head: [['Verwendetes Material', 'Menge']],
+      body: (entry.materials ?? []).map((item) => [item.name, item.menge]),
+      theme: 'grid',
+      headStyles: { fillColor: SURFACE_2, textColor: TEXT, fontStyle: 'bold' },
+      styles: { fontSize: 10, textColor: TEXT, lineColor: BORDER, lineWidth: 0.2, cellPadding: 3.5 },
+      columnStyles: { 1: { cellWidth: 50 } },
+      margin: continuationMargin,
+      didDrawPage,
+    });
+  }
+
+  let blockY = lastTableBottom(doc) + 12;
+  if (blockY + SESSION_BLOCK_HEIGHT > CONTENT_BOTTOM) {
+    doc.addPage();
+    drawReportHeader(doc, { ...header, full: false });
+    blockY = 34;
+  }
+
+  const gap = 10;
+  const boxWidth = (contentWidth - gap) / 2;
+  drawSessionSignatureBox(
+    doc,
+    `Techniker: ${technicianName}`,
+    entry.technician_signature,
+    entry.signed_at,
+    PAGE_MARGIN,
+    blockY,
+    boxWidth
+  );
+  drawSessionSignatureBox(
+    doc,
+    `Kunde: ${customer.name}`,
+    entry.customer_signature,
+    entry.signed_at,
+    PAGE_MARGIN + boxWidth + gap,
+    blockY,
+    boxWidth
+  );
+
+  drawFooters(doc);
   return doc;
 };

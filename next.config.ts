@@ -14,6 +14,15 @@ const nextConfig: NextConfig = {
   basePath,
   assetPrefix: basePath,
   images: { unoptimized: true },
+  webpack(config) {
+    // docx-templates' browser bundle carries JSZip's Node-only stream adapter behind an
+    // optional require that only generateNodeStream() uses; the browser never calls it.
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings ?? []),
+      { module: /docx-templates[\\/]lib[\\/]browser\.js/, message: /NodejsStreamOutputAdapter/ },
+    ];
+    return config;
+  },
 };
 
 export default withSerwist(nextConfig);

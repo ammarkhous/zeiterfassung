@@ -1,5 +1,12 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { Customer, SessionType, TimeEntry, SyncQueueItem, TimerState } from '@/types';
+import {
+  Customer,
+  SessionType,
+  StoredTemplate,
+  TimeEntry,
+  SyncQueueItem,
+  TimerState,
+} from '@/types';
 
 interface ZeiterfassungDB extends DBSchema {
   customers: {
@@ -24,10 +31,15 @@ interface ZeiterfassungDB extends DBSchema {
     key: string;
     value: TimerState;
   };
+  // Local copy of the admin-uploaded Word templates, so exports work offline.
+  report_templates: {
+    key: string;
+    value: StoredTemplate;
+  };
 }
 
 const BASE_DB_NAME = 'zeiterfassung-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbName = BASE_DB_NAME;
 let dbPromise: Promise<IDBPDatabase<ZeiterfassungDB>> | null = null;
@@ -65,6 +77,10 @@ export const getDB = (): Promise<IDBPDatabase<ZeiterfassungDB>> => {
         }
         if (!db.objectStoreNames.contains('timer_state')) {
           db.createObjectStore('timer_state', { keyPath: 'key' });
+        }
+        // Added in version 2; version 1 databases are upgraded in place.
+        if (!db.objectStoreNames.contains('report_templates')) {
+          db.createObjectStore('report_templates', { keyPath: 'kind' });
         }
       },
     });

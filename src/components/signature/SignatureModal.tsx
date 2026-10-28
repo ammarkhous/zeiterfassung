@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { SignaturePad } from '@/components/signature/SignaturePad';
 import { formatAE, minutesToHHMM } from '@/lib/ae';
 import { formatDateDDMMYYYY } from '@/lib/export';
+import { formatKm, formatMaterialLine, hasMaterials, hasTravel } from '@/lib/materials';
 import { TimeEntry } from '@/types';
 
 export interface CapturedSignatures {
@@ -88,6 +89,20 @@ export const SignatureModal = ({
               <span className="font-bold">{formatAE(entry.duration_minutes)}</span>{' '}
               <span className="text-text-muted">({minutesToHHMM(entry.duration_minutes)})</span>
             </DetailRow>
+            {hasTravel(entry) && (
+              <DetailRow label="Fahrt">{formatKm(entry.travel_km as number)}</DetailRow>
+            )}
+            {hasMaterials(entry) && (
+              <DetailRow label="Material">
+                <ul className="flex flex-col gap-0.5">
+                  {(entry.materials ?? []).map((item, index) => (
+                    <li key={`${item.name}-${index}`} className="break-words">
+                      {formatMaterialLine(item)}
+                    </li>
+                  ))}
+                </ul>
+              </DetailRow>
+            )}
             <DetailRow label="Techniker">{technicianName}</DetailRow>
           </dl>
 

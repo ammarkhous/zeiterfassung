@@ -15,6 +15,7 @@ import { ListIcon, MailIcon } from '@/components/nav/icons';
 import { EntryForm, EntryFormValues } from '@/components/entry/EntryForm';
 import { minutesToAE, minutesToHHMM, formatAE } from '@/lib/ae';
 import { sendSessionByMail } from '@/lib/mail';
+import { materialAndTravelLines } from '@/lib/materials';
 import { TimeEntry } from '@/types';
 
 const PAGE_SIZE = 50;
@@ -191,6 +192,15 @@ export default function SessionsPage() {
                         ? entry.notes.slice(0, 60) + '…'
                         : entry.notes
                       : '—'}
+                    {materialAndTravelLines(entry).map((line) => (
+                      <div
+                        key={line}
+                        className={expandedNotesId === entry.id ? 'text-xs' : 'truncate text-xs'}
+                        title={line}
+                      >
+                        {line}
+                      </div>
+                    ))}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2">
                     <div className="flex items-center gap-2">

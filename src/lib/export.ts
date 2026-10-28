@@ -1,6 +1,15 @@
 import { MonthlyReportRow, TimeEntry } from '@/types';
 import { minutesToAE, minutesToHHMM } from '@/lib/ae';
 import { GERMAN_MONTHS } from '@/lib/germanMonths';
+import { translateToGerman } from '@/lib/translate';
+import {
+  formatKm,
+  formatMaterialLine,
+  hasMaterials,
+  hasTravel,
+  materialAndTravelLines,
+  sumKm,
+} from '@/lib/materials';
 
 export const formatEUR = (value: number): string =>
   value.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
@@ -11,6 +20,83 @@ export const formatDateDDMMYYYY = (isoDate: string): string => {
 };
 
 const formatAEComma = (minutes: number): string => minutesToAE(minutes).toFixed(1).replace('.', ',');
+
+// Keeps a customer name usable as part of a file name.
+export const safeFilePart = (value: string): string =>
+  value.replace(/[^A-Za-z0-9äöüÄÖÜß._-]+/g, '_').replace(/^_+|_+$/g, '') || 'Kunde';
+
+// Base name (without extension) of a single-session export. The start time keeps
+// two sessions of the same customer on the same day from sharing a file name.
+export const sessionFileBaseName = (entry: TimeEntry, customerName: string): string => {
+  const started = new Date(entry.started_at ?? entry.created_at);
+  const time = Number.isNaN(started.getTime())
+    ? ''
+    : `_${started.getHours().toString().padStart(2, '0')}${started.getMinutes().toString().padStart(2, '0')}`;
+  return `Session_${safeFilePart(customerName)}_${entry.entry_date}${time}`;
+};
+
+// Notes are translated to German once per distinct text, so a report shows them
+// the same way they were entered or auto-translated. Untranslatable notes (or no
+// connection) simply keep their original text.
+export const buildGermanNotesMap = async (rows: MonthlyReportRow[]): Promise<Map<string, string>> => {
+  const uniqueNotes = new Set<string>();
+  for (const row of rows) {
+    for (const entry of row.entries) {
+      if (entry.notes) uniqueNotes.add(entry.notes);
+    }
+  }
+
+  const map = new Map<string, string>();
+  await Promise.all(
+    Array.from(uniqueNotes).map(async (note) => {
+      const translated = await translateToGerman(note);
+      if (translated) map.set(note, translated);
+    })
+  );
+  return map;
+};
+
+// Semicolon-separated (German Excel standard). A single session is just a report
+// with one row and one entry, so all CSV exports share this builder.
+export const buildReportCsv = (
+  rows: MonthlyReportRow[],
+  sessionTypeLabel: (id: string) => string,
+  noteFor: (notes: string | null) => string
+): string => {
+  // Fahrt_km and Material are appended at the end, so anything reading the first
+  // eight columns keeps working.
+  const lines: string[] = ['Datum;Kunde;Typ;AE;Minuten;Notizen;Satz_EUR_pro_AE;Wert_EUR;Fahrt_km;Material'];
+
+  for (const row of rows) {
+    for (const entry of row.entries) {
+      const ae = minutesToAE(entry.duration_minutes);
+      const value = ae * row.customer.ae_rate;
+      const notes = noteFor(entry.notes).replace(/;/g, ',').replace(/\r?\n/g, ' ');
+      const km = hasTravel(entry) ? (entry.travel_km as number).toFixed(1).replace('.', ',') : '';
+      const material = (entry.materials ?? [])
+        .map(formatMaterialLine)
+        .join(' | ')
+        .replace(/;/g, ',')
+        .replace(/\r?\n/g, ' ');
+      lines.push(
+        [
+          formatDateDDMMYYYY(entry.entry_date),
+          row.customer.name,
+          sessionTypeLabel(entry.session_type_id),
+          ae.toFixed(1).replace('.', ','),
+          entry.duration_minutes.toString(),
+          notes,
+          row.customer.ae_rate.toFixed(2).replace('.', ','),
+          value.toFixed(2).replace('.', ','),
+          km,
+          material,
+        ].join(';')
+      );
+    }
+  }
+
+  return lines.join('\r\n');
+};
 
 const RULE_WIDTH = 64;
 const HEAVY_RULE = '='.repeat(RULE_WIDTH);
@@ -40,6 +126,8 @@ export const buildReportTxt = (
     `Sessionen:   ${totalSessions}`,
     `Gesamtwert:  ${formatEUR(totalValue)}`,
   ];
+  const totalKm = sumKm(rows.flatMap((r) => r.entries));
+  if (totalKm > 0) lines.push(`Kilometer:   ${formatKm(totalKm)}`);
 
   for (const row of rows) {
     lines.push(
@@ -60,6 +148,7 @@ export const buildReportTxt = (
       ];
       if (note) parts.push(note);
       lines.push(parts.join(' | '));
+      for (const extra of materialAndTravelLines(entry)) lines.push(`    ${extra}`);
     }
 
     lines.push(
@@ -68,6 +157,7 @@ export const buildReportTxt = (
         row.total_minutes
       )} | ${formatEUR(row.total_value)}`
     );
+    if (sumKm(row.entries) > 0) lines.push(`Gefahrene Kilometer: ${formatKm(sumKm(row.entries))}`);
   }
 
   lines.push('', HEAVY_RULE, `GESAMT: ${formatAEComma(totalMinutes)} AE | ${minutesToHHMM(totalMinutes)} | ${formatEUR(totalValue)}`);
@@ -80,7 +170,8 @@ export const buildReportTxt = (
 export const buildSessionTxt = (
   entry: TimeEntry,
   customerName: string,
-  sessionTypeLabel: string
+  sessionTypeLabel: string,
+  technicianName?: string
 ): string => {
   const lines = [
     'ZEITERFASSUNG',
@@ -90,6 +181,11 @@ export const buildSessionTxt = (
     `Typ: ${sessionTypeLabel}`,
     `Dauer: ${formatAEComma(entry.duration_minutes)} AE (${minutesToHHMM(entry.duration_minutes)})`,
   ];
+  if (technicianName) lines.push(`Techniker: ${technicianName}`);
+  if (hasTravel(entry)) lines.push(`Fahrt: ${formatKm(entry.travel_km as number)}`);
+  if (hasMaterials(entry)) {
+    lines.push('', 'Material:', ...(entry.materials ?? []).map((item) => `- ${formatMaterialLine(item)}`));
+  }
   const notes = entry.notes?.trim();
   if (notes) lines.push('', 'Notizen:', notes.replace(/\r?\n/g, '\r\n'));
   return lines.join('\r\n') + '\r\n';
@@ -99,6 +195,17 @@ export const buildSessionTxt = (
 // because canShare() only accepts bare MIME types; the BOM carries the encoding.
 export const createTextFile = (content: string, filename: string): File =>
   new File(['﻿' + content], filename, { type: 'text/plain' });
+
+export const downloadBlob = (blob: Blob, filename: string): void => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
 
 // Starts a browser download of a text file; the BOM makes Excel and Notepad
 // read it as UTF-8 (umlauts).

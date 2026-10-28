@@ -1,6 +1,13 @@
 import { TimeEntry } from '@/types';
 import { minutesToAE, minutesToHHMM } from '@/lib/ae';
-import { buildSessionTxt, createTextFile, downloadTextFile, formatDateDDMMYYYY } from '@/lib/export';
+import { materialAndTravelLines } from '@/lib/materials';
+import {
+  buildSessionTxt,
+  createTextFile,
+  downloadTextFile,
+  formatDateDDMMYYYY,
+  safeFilePart,
+} from '@/lib/export';
 
 // Mail clients and browsers cap mailto: URLs (roughly 2000 characters in
 // practice, e.g. classic Outlook). Notes that do not fit are never dropped
@@ -21,9 +28,6 @@ export interface SessionMail {
   fileContent: string;
 }
 
-const safeFilePart = (value: string): string =>
-  value.replace(/[^A-Za-z0-9äöüÄÖÜß._-]+/g, '_').replace(/^_+|_+$/g, '') || 'Kunde';
-
 export const buildSessionMail = (
   entry: TimeEntry,
   customerName: string,
@@ -38,6 +42,7 @@ export const buildSessionMail = (
     `Datum: ${date}`,
     `Typ: ${sessionTypeLabel}`,
     `Dauer: ${duration}`,
+    ...materialAndTravelLines(entry),
   ];
   const notes = entry.notes?.trim() || null;
 

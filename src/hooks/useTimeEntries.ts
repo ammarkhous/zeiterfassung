@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getDB } from '@/lib/db';
 import { writeWithSync, DATA_CHANGED_EVENT } from '@/lib/sync';
-import { TimeEntry } from '@/types';
+import { MaterialItem, TimeEntry } from '@/types';
 
 const localDateString = (d: Date): string => {
   const y = d.getFullYear();
@@ -39,6 +39,8 @@ export const useTimeEntries = () => {
       entry_date: string;
       started_at?: string | null;
       ended_at?: string | null;
+      materials?: MaterialItem[];
+      travel_km?: number | null;
     }) => {
       const now = new Date().toISOString();
       const entry: TimeEntry = {
@@ -52,6 +54,8 @@ export const useTimeEntries = () => {
         ended_at: data.ended_at ?? null,
         created_at: now,
         updated_at: now,
+        materials: data.materials ?? [],
+        travel_km: data.travel_km ?? null,
       };
       await writeWithSync('time_entries', 'insert', entry as unknown as Record<string, unknown>);
       await reload();
