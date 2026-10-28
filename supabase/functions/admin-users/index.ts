@@ -10,11 +10,11 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 12;
 const BAN_FOREVER = '876000h';
 
-// Phase C of the MFA rollout: when set to "true" (function secret), an admin must have
-// passed the authenticator check (JWT claim aal = aal2) to use any action. Off by
-// default so an admin who has not set up an authenticator yet is not locked out of
-// the Admin tab while everybody enrolls.
-const REQUIRE_AAL2 = Deno.env.get('REQUIRE_AAL2') === 'true';
+// An admin must have passed the authenticator check (JWT claim aal = aal2) to use any
+// action. On by default (without it, anyone with an admin password could remove the
+// admin's authenticator via resetMfa and enroll their own). Setting the function secret
+// REQUIRE_AAL2=false switches it off, e.g. while bootstrapping the first admin.
+const REQUIRE_AAL2 = Deno.env.get('REQUIRE_AAL2') !== 'false';
 
 // Assurance level claim of the caller's access token. Only read after getUser() has
 // validated the token with the auth server, so the payload can be trusted.

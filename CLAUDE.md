@@ -102,12 +102,14 @@ hinzufügen, Authenticator entfernen (der letzte nicht). Es gibt keine Recovery-
 - **Handy verloren:** Administrator → Admin-Tab → „MFA zurücksetzen“ (Edge Function `resetMfa`, löscht alle
   Faktoren, meldet den Benutzer überall ab; neue Einrichtung bei der nächsten Anmeldung). Verliert der **einzige**
   Administrator sein Handy: im Supabase SQL Editor `delete from auth.mfa_factors where user_id = '<id>';`.
-- **Durchsetzung in der Datenbank (Rollout-Schritt C, NICHT automatisch angewendet):** Ohne sie gilt MFA nur in
-  der App-Oberfläche; wer Passwort + API hat, könnte mit einem `aal1`-Token Daten lesen. Reihenfolge: **A** Code
-  deployen → **B** jeder Benutzer meldet sich einmal an und richtet MFA ein (Administrator zuerst; die Vorabfrage
-  steht im Kopf von `supabase/mfa_enforcement.sql`) → **C** `supabase/mfa_enforcement.sql` anwenden (restriktive
-  RLS-Policies auf `auth.jwt()->>'aal'`) und Function-Secret `REQUIRE_AAL2=true` setzen. Vorher anwenden sperrt
-  jede Sitzung ohne MFA aus, auch alte, im Cache liegende App-Versionen. Rückgängig: die fünf „require aal2“-Policies droppen.
+- **Durchsetzung in der Datenbank (seit 28.10.2026 AKTIV):** Fünf restriktive RLS-Policies „require aal2“
+  (`supabase/mfa_enforcement.sql`, Migration `mfa_enforcement_aal2`) auf `auth.jwt()->>'aal'`: eine Sitzung ohne
+  Authenticator-Code (`aal1`) sieht und schreibt nichts, auch nicht über die API. Die Edge Function `admin-users`
+  verlangt ebenfalls `aal2` (Standard; nur das Function-Secret `REQUIRE_AAL2=false` schaltet das ab, etwa zum Anlegen
+  des allerersten Administrators). Neue Benutzer können trotzdem starten: die Einrichtung läuft über den Auth-Dienst,
+  nicht über die geschützten Tabellen. Ein Konto ohne MFA sieht bis zur Einrichtung keine Daten. Rückgängig machen
+  (wenn jemand ausgesperrt ist): die fünf „require aal2“-Policies droppen. Wer ein neues Supabase-Projekt aufsetzt,
+  wendet die Datei erst an, wenn der erste Administrator MFA eingerichtet hat.
 - **Datenbankrechte:** `anon` hat auf keine Tabelle Zugriff; `authenticated` nur SELECT/INSERT/UPDATE/DELETE
   (kein TRUNCATE/TRIGGER/REFERENCES, denn TRUNCATE umgeht RLS), `profiles` nur SELECT (geschrieben wird nur über
   die Edge Function). `rls_auto_enable()` ist nicht per API aufrufbar. Steht auch in `supabase/schema.sql`.
