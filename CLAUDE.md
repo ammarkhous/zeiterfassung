@@ -3,8 +3,9 @@
 ## Zweck (Project purpose)
 
 Persönliches Zeiterfassungstool für einen freiberuflichen IT-Berater. Erfasst Arbeitssessions
-pro Kunde, misst Zeit in AE (Arbeitseinheit), und erstellt monatliche Abrechnungen. Single-user
-App, über mehrere Geräte hinweg genutzt (Handy, Laptop, Desktop). Muss als PWA installierbar sein
+pro Kunde, misst Zeit in AE (Arbeitseinheit), und erstellt monatliche Abrechnungen. Mehrbenutzer-
+App (Administrator legt Benutzer an), über mehrere Geräte hinweg genutzt (Handy, Laptop, Desktop).
+Mehrere Timer können gleichzeitig laufen. Muss als PWA installierbar sein
 und vollständig offline funktionieren — Timer und manuelle Erfassung laufen ohne Internet und
 synchronisieren automatisch mit Supabase, sobald die Verbindung wiederhergestellt ist.
 
@@ -18,9 +19,11 @@ synchronisieren automatisch mit Supabase, sobald die Verbindung wiederhergestell
 - **Serwist** (nicht `next-pwa`, das ist deprecated) — Service-Worker-Generierung für PWA-Funktionalität.
 - **jspdf + jspdf-autotable** — clientseitige PDF-Generierung für Abrechnungen.
 - **Natives CSV-Export** — kein zusätzliches Paket nötig, einfacher String-Export mit BOM.
-- **Deployment:** Vercel. **Package Manager:** npm.
+- **Deployment:** GitHub Pages (statischer Export, `.github/workflows/deploy-pages.yml`, Base-Path
+  `/zeiterfassung`, Push auf `main` deployt). **Package Manager:** npm.
 - Reine Client-Side SPA: keine Server Components, keine Server Actions, keine API-Routes. Alle
-  Supabase-Aufrufe laufen ausschließlich clientseitig durch die Sync-Engine (`src/lib/sync.ts`).
+  Daten-Aufrufe laufen clientseitig durch die Sync-Engine (`src/lib/sync.ts`). Einzige serverseitige
+  Logik: die Supabase Edge Function `admin-users` (Benutzerverwaltung, braucht den Service-Role-Key).
 
 ## AE-Umrechnungsregel
 
@@ -50,11 +53,55 @@ Alle Reads kommen ausschließlich aus IndexedDB. Alle Writes gehen zuerst nach I
 6. Verbindung wiederhergestellt: `sync_queue` wird FIFO abgearbeitet.
 7. Beim nächsten App-Start: vollständiger Re-Sync von Supabase zur Konfliktauflösung.
 
-**Konfliktauflösung:** `updated_at`-Zeitstempel gewinnt — der neuere Datensatz überschreibt den älteren.
+**Konfliktauflösung:** Beim Pull überschreibt der Serverstand lokale Zeilen, außer sie liegen noch
+unsynchronisiert in der `sync_queue`. Ein Vergleich der `updated_at`-Zeitstempel findet nicht statt.
 
-IndexedDB-Datenbank: `zeiterfassung-db` (Version 1) mit Stores `customers`, `session_types`,
-`time_entries` (Indizes: `by-date`, `by-customer`), `sync_queue` (Index: `by-timestamp`),
-`timer_state`.
+**Abgelehnte Änderungen:** Lehnt der Server einen Queue-Eintrag dauerhaft ab (Postgres-Fehlerklassen
+22/23/42, z. B. RLS- oder Fremdschlüssel-Verletzung), wird er verworfen, der lokale Stand per Pull
+zurückgesetzt und ein Hinweis angezeigt. Netzwerk-/Auth-Fehler bleiben in der Queue und werden
+wiederholt. `drainSyncQueue` läuft nie parallel. Beim Zurückkehren ins Fenster wird (max. 1×/Minute)
+neu synchronisiert, damit geteilte Kunden/Typen anderer Benutzer ankommen.
+
+IndexedDB-Datenbank: `zeiterfassung-db-<userId>` (Version 1), **eine pro Benutzer**, gesetzt über
+`setDbUser()` in `src/lib/db.ts` bevor ein Hook die DB anfasst (`(app)/layout.tsx`). Stores
+`customers`, `session_types`, `time_entries` (Indizes: `by-date`, `by-customer`), `sync_queue`
+(Index: `by-timestamp`), `timer_state`. Die alte gemeinsame `zeiterfassung-db` wird nicht mehr benutzt.
+
+## Mehrbenutzer & Administration
+
+- **Datenmodell:** `customers` und `session_types` sind für alle Benutzer geteilt, `time_entries`
+  gehören einem Benutzer (`user_id`, Default `auth.uid()`) und sind nur für ihn sichtbar. Auch der
+  Administrator sieht nur eigene Einträge.
+- **Zugriff:** Jede Policy verlangt eine aktive Zeile in `profiles` (`is_active_user()`). Ein Konto ohne
+  Profil (z. B. fremde GitHub-Anmeldung) oder mit `disabled = true` sieht nichts. Löschen von Kunden/Typen
+  darf nur `is_admin()`; Fremdschlüssel auf `time_entries` sind `on delete restrict`.
+- **Rollen:** `admin` | `user`, in `profiles.role`. Der Client liest sie über `useProfile`
+  (`src/hooks/useProfile.tsx`, Rolle offline aus localStorage gecacht). Deaktivierte/profillose Konten
+  werden abgemeldet; die Meldung erscheint auf der Login-Seite.
+- **Admin-Tab** (`/admin`, nur für Administratoren sichtbar): Benutzer anlegen (Benutzername **oder**
+  E-Mail + Passwort), auflisten, Passwort ändern, deaktivieren/aktivieren, löschen (löscht auch deren
+  Einträge). Alles läuft über die Edge Function `supabase/functions/admin-users/index.ts`
+  (`src/lib/adminApi.ts`); sie prüft serverseitig die Admin-Rolle. Sie braucht Internet.
+- **Benutzername:** wird auf die Pseudo-E-Mail `<name>@users.zeiterfassung.local` abgebildet
+  (`src/lib/auth.ts`, muss mit der Edge Function übereinstimmen). Login akzeptiert beides.
+- **Neues Supabase-Projekt:** `supabase/schema.sql` ausführen, ersten Benutzer im Auth-Dashboard
+  anlegen und per `insert into profiles (id, role) values ('<id>', 'admin')` zum Admin machen, Edge
+  Function `admin-users` deployen. „Allow new users to sign up“ im Auth-Dashboard ausschalten.
+- **Bekannte Einschränkung:** Der AE-Satz liegt am (geteilten) Kunden, nicht am Eintrag. Eine
+  Änderung wirkt rückwirkend auf alle Berichte aller Benutzer.
+
+## Timer
+
+Mehrere Timer gleichzeitig (`src/hooks/useTimers.ts`, `src/components/timer/TimerCard.tsx`). Jeder Timer
+ist ein Datensatz in `timer_state` (Schlüssel = uuid) mit Status `running` | `paused` | `stopped`; ein
+gestoppter, noch nicht gespeicherter Timer überlebt einen Reload. Timer sind lokal pro Gerät und Benutzer
+und werden nicht synchronisiert.
+
+## Export & Versand
+
+Abrechnung als PDF, CSV (Semikolon, UTF-8 mit BOM) und TXT (`src/lib/export.ts`). Pro Session gibt es
+einen E-Mail-Button, der das Standard-Mailprogramm per `mailto:` ohne Empfänger öffnet
+(`src/lib/mail.ts`; lange Notizen werden gekürzt, damit die URL funktioniert).
 
 ## Ordnerstruktur
 
@@ -63,8 +110,9 @@ src/
   app/
     (auth)/login/page.tsx
     (app)/
-      layout.tsx           geschützter Layout mit Sidebar + BottomNav
+      layout.tsx           geschütztes Layout mit TopNav; setzt die Benutzer-DB, Profil, Sync
       page.tsx             Dashboard
+      admin/page.tsx       Benutzerverwaltung (nur Administratoren)
       new-entry/page.tsx
       sessions/page.tsx
       report/page.tsx
@@ -74,16 +122,18 @@ src/
     layout.tsx             Root-Layout mit PWA-Meta-Tags
     globals.css
   components/
-    nav/       Sidebar.tsx, BottomNav.tsx, SyncStatus.tsx
-    timer/     TimerWidget.tsx
+    nav/       TopNav.tsx, SyncStatus.tsx, Logo.tsx, UpdatePrompt.tsx, icons.tsx
+    timer/     TimerWidget.tsx, TimerCard.tsx
     entry/     AEInput.tsx, EntryForm.tsx
     report/    ReportTable.tsx, ExportButtons.tsx
-    ui/        Button.tsx, Input.tsx, Select.tsx, Modal.tsx, Badge.tsx, Toast.tsx
-  lib/         supabase.ts, db.ts, ae.ts, sync.ts
-  hooks/       useCustomers.ts, useSessionTypes.ts, useTimeEntries.ts, useTimer.ts, useSync.ts, useOnlineStatus.ts
+    ui/        Button.tsx, Input.tsx, Select.tsx, Modal.tsx, Badge.tsx, Toast.tsx, IconButton.tsx, ...
+  lib/         supabase.ts, db.ts, ae.ts, sync.ts, export.ts, mail.ts, auth.ts, adminApi.ts, translate.ts
+  hooks/       useCustomers.ts, useSessionTypes.ts, useTimeEntries.ts, useTimers.ts, useSync.ts,
+               useOnlineStatus.ts, useProfile.tsx
   types/       index.ts
 supabase/
-  schema.sql   manuell im Supabase SQL Editor auszuführen
+  schema.sql   Endzustand des Schemas (manuell im Supabase SQL Editor auszuführen)
+  functions/admin-users/index.ts   Edge Function (Benutzerverwaltung), per Supabase deployt
 public/
   manifest.json, icons/, sw.js (generiert)
 ```
@@ -107,8 +157,10 @@ npm run start          # Produktions-Server lokal starten
 npm run lint            # ESLint
 ```
 
-Deployment: Vercel-Projekt mit diesem Repo verbinden, Umgebungsvariablen in den
-Projekteinstellungen setzen, dann `git push` löst automatisches Deployment aus.
+Deployment: `git push` auf `main` startet den GitHub-Actions-Workflow (GitHub Pages). Die
+Supabase-Werte kommen aus den Repository-Secrets `NEXT_PUBLIC_SUPABASE_URL` und
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`. Lokaler Test des Pages-Exports (Git Bash braucht
+`MSYS_NO_PATHCONV=1`): `GITHUB_PAGES=true NEXT_PUBLIC_BASE_PATH=/zeiterfassung npm run build`.
 
 Supabase-Setup: `supabase/schema.sql` im Supabase SQL Editor ausführen. Danach im Supabase
 Auth-Dashboard manuell einen Benutzer-Account anlegen (keine Registrierungs-UI in der App).
@@ -116,7 +168,7 @@ Auth-Dashboard manuell einen Benutzer-Account anlegen (keine Registrierungs-UI i
 **Aktuelles Projekt:** `rlctnbqytjphyfetzxxm` (eu-west-1) — Schema bereits angewendet,
 `.env.local` bereits mit URL/Anon-Key befüllt.
 
-**Login:** E-Mail/Passwort (`supabase.auth.signInWithPassword`) sowie optional GitHub OAuth
+**Login:** Benutzername oder E-Mail + Passwort (`supabase.auth.signInWithPassword`) sowie optional GitHub OAuth
 (`supabase.auth.signInWithOAuth({ provider: 'github' })`). Für GitHub-Login: eine GitHub OAuth
 App unter github.com/settings/developers anlegen (Callback-URL:
 `https://rlctnbqytjphyfetzxxm.supabase.co/auth/v1/callback`), Client-ID/Secret im Supabase

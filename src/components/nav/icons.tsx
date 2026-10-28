@@ -96,3 +96,24 @@ export const LogoutIcon = ({ className = '' }: { className?: string }) => (
     <path d="M16 17l5-5-5-5M21 12H9" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
+
+export const MailIcon = ({ className = '' }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="M3 7l9 6 9-6" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+export const ShieldIcon = ({ className = '' }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+    <path d="M12 3l8 3v6c0 4.5-3.2 8.2-8 9-4.8-.8-8-4.5-8-9V6l8-3z" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+export const KeyIcon = ({ className = '' }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+    <circle cx="8" cy="15" r="4" />
+    <path d="M10.8 12.2L20 3M16 7l3 3M14 9l2 2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);

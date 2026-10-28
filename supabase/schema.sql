@@ -1,3 +1,11 @@
+-- Zeiterfassung schema (multi-user).
+-- Run once in the Supabase SQL editor on a fresh project. The live project was
+-- migrated step by step (migration "multi_user_profiles_and_rls"); this file
+-- describes the resulting state.
+--
+-- Data model: customers and session_types are shared by all users, time_entries
+-- are private per user. Every data access requires an enabled row in profiles.
+
 create table customers (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -20,10 +28,23 @@ insert into session_types (label) values
   ('Meeting'),
   ('Sonstiges');
 
+-- One row per auth user: role and disabled flag. Rows are created/changed by the
+-- admin-users edge function (service role), never by the client.
+create table profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  username text unique,
+  role text not null default 'user' check (role in ('admin', 'user')),
+  disabled boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+-- Customers / types referenced by entries cannot be deleted (restrict), so
+-- deleting a shared customer can never wipe another user's entries.
 create table time_entries (
   id uuid primary key default gen_random_uuid(),
-  customer_id uuid references customers(id) on delete cascade,
-  session_type_id uuid references session_types(id),
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  customer_id uuid references customers(id) on delete restrict,
+  session_type_id uuid references session_types(id) on delete restrict,
   duration_minutes integer not null,
   notes text,
   entry_date date not null default current_date,
@@ -33,13 +54,79 @@ create table time_entries (
   updated_at timestamptz default now()
 );
 
+create index time_entries_user_id_idx on time_entries (user_id);
+
+alter table profiles enable row level security;
 alter table customers enable row level security;
 alter table session_types enable row level security;
 alter table time_entries enable row level security;
 
-create policy "auth only" on customers for all using (auth.role() = 'authenticated');
-create policy "auth only" on session_types for all using (auth.role() = 'authenticated');
-create policy "auth only" on time_entries for all using (auth.role() = 'authenticated');
+create or replace function is_active_user()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = (select auth.uid()) and not disabled
+  );
+$$;
+
+create or replace function is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = (select auth.uid()) and role = 'admin' and not disabled
+  );
+$$;
+
+revoke execute on function is_active_user() from public, anon;
+revoke execute on function is_admin() from public, anon;
+grant execute on function is_active_user() to authenticated;
+grant execute on function is_admin() to authenticated;
+
+create policy "own profile" on profiles
+  for select to authenticated
+  using (id = (select auth.uid()));
+
+create policy "own entries select" on time_entries
+  for select to authenticated
+  using (user_id = (select auth.uid()) and is_active_user());
+create policy "own entries insert" on time_entries
+  for insert to authenticated
+  with check (user_id = (select auth.uid()) and is_active_user());
+create policy "own entries update" on time_entries
+  for update to authenticated
+  using (user_id = (select auth.uid()) and is_active_user())
+  with check (user_id = (select auth.uid()) and is_active_user());
+create policy "own entries delete" on time_entries
+  for delete to authenticated
+  using (user_id = (select auth.uid()) and is_active_user());
+
+create policy "customers select" on customers
+  for select to authenticated using (is_active_user());
+create policy "customers insert" on customers
+  for insert to authenticated with check (is_active_user());
+create policy "customers update" on customers
+  for update to authenticated using (is_active_user()) with check (is_active_user());
+create policy "customers delete" on customers
+  for delete to authenticated using (is_admin());
+
+create policy "session_types select" on session_types
+  for select to authenticated using (is_active_user());
+create policy "session_types insert" on session_types
+  for insert to authenticated with check (is_active_user());
+create policy "session_types update" on session_types
+  for update to authenticated using (is_active_user()) with check (is_active_user());
+create policy "session_types delete" on session_types
+  for delete to authenticated using (is_admin());
 
 create or replace function update_updated_at()
 returns trigger as $$
@@ -52,3 +139,8 @@ set search_path = public;
 
 create trigger customers_updated_at before update on customers for each row execute function update_updated_at();
 create trigger time_entries_updated_at before update on time_entries for each row execute function update_updated_at();
+
+-- First admin: create the user in Supabase Auth (dashboard), then run
+--   insert into profiles (id, role) values ('<auth user id>', 'admin');
+-- Further users are created in the app's Admin tab (edge function admin-users,
+-- see supabase/functions/admin-users).

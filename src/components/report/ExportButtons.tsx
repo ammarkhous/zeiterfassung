@@ -7,29 +7,13 @@ import { Button } from '@/components/ui/Button';
 import { MonthlyReportRow } from '@/types';
 import { minutesToAE, minutesToHHMM } from '@/lib/ae';
 import { translateToGerman } from '@/lib/translate';
-
-const GERMAN_MONTHS = [
-  'Januar',
-  'Februar',
-  'März',
-  'April',
-  'Mai',
-  'Juni',
-  'Juli',
-  'August',
-  'September',
-  'Oktober',
-  'November',
-  'Dezember',
-];
-
-const formatEUR = (value: number): string =>
-  value.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
-
-const formatDateDDMMYYYY = (isoDate: string): string => {
-  const [y, m, d] = isoDate.split('-');
-  return `${d}.${m}.${y}`;
-};
+import { GERMAN_MONTHS } from '@/lib/germanMonths';
+import {
+  buildReportTxt,
+  downloadTextFile,
+  formatDateDDMMYYYY,
+  formatEUR,
+} from '@/lib/export';
 
 const buildGermanNotesMap = async (rows: MonthlyReportRow[]): Promise<Map<string, string>> => {
   const uniqueNotes = new Set<string>();
@@ -57,7 +41,7 @@ interface ExportButtonsProps {
 }
 
 export const ExportButtons = ({ rows, year, month, sessionTypeLabel }: ExportButtonsProps) => {
-  const [exporting, setExporting] = useState<'pdf' | 'csv' | null>(null);
+  const [exporting, setExporting] = useState<'pdf' | 'csv' | 'txt' | null>(null);
   const monthLabel = GERMAN_MONTHS[month];
   const fileSuffix = `${year}-${(month + 1).toString().padStart(2, '0')}`;
 
@@ -266,26 +250,33 @@ export const ExportButtons = ({ rows, year, month, sessionTypeLabel }: ExportBut
       }
     }
 
-    const csvContent = lines.join('\r\n');
-    const blob = new Blob(['﻿' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Abrechnung_${fileSuffix}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    downloadTextFile(lines.join('\r\n'), `Abrechnung_${fileSuffix}.csv`, 'text/csv');
+    setExporting(null);
+  };
+
+  const handleTxtExport = async () => {
+    setExporting('txt');
+    const germanNotes = await buildGermanNotesMap(rows);
+    const noteFor = (notes: string | null) => (notes ? germanNotes.get(notes) ?? notes : '');
+
+    downloadTextFile(
+      buildReportTxt(rows, year, month, sessionTypeLabel, noteFor),
+      `Abrechnung_${fileSuffix}.txt`,
+      'text/plain'
+    );
     setExporting(null);
   };
 
   return (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-2">
       <Button onClick={handlePdfExport} disabled={exporting !== null}>
         {exporting === 'pdf' ? 'Wird exportiert...' : 'PDF exportieren'}
       </Button>
       <Button variant="secondary" onClick={handleCsvExport} disabled={exporting !== null}>
         {exporting === 'csv' ? 'Wird exportiert...' : 'CSV exportieren'}
+      </Button>
+      <Button variant="secondary" onClick={handleTxtExport} disabled={exporting !== null}>
+        {exporting === 'txt' ? 'Wird exportiert...' : 'TXT exportieren'}
       </Button>
     </div>
   );

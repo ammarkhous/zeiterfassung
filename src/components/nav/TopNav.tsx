@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { useProfile } from '@/hooks/useProfile';
 import { SyncStatus } from './SyncStatus';
 import { SyncStatus as SyncStatusType } from '@/types';
 import { Logo } from './Logo';
@@ -13,6 +14,7 @@ import {
   BarChartIcon,
   GearIcon,
   LogoutIcon,
+  ShieldIcon,
 } from './icons';
 
 const navItems = [
@@ -23,6 +25,8 @@ const navItems = [
   { label: 'Einstellungen', href: '/settings', icon: GearIcon },
 ];
 
+const adminNavItem = { label: 'Admin', href: '/admin', icon: ShieldIcon };
+
 interface TopNavProps {
   syncStatus: SyncStatusType;
 }
@@ -30,6 +34,8 @@ interface TopNavProps {
 export const TopNav = ({ syncStatus }: TopNavProps) => {
   const pathname = usePathname();
   const router = useRouter();
+  const { isAdmin } = useProfile();
+  const visibleNavItems = isAdmin ? [...navItems, adminNavItem] : navItems;
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -57,7 +63,7 @@ export const TopNav = ({ syncStatus }: TopNavProps) => {
         </div>
 
         <nav className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const active = pathname === item.href;
             const Icon = item.icon;
             return (

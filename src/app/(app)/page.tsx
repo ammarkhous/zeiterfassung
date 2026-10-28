@@ -6,13 +6,15 @@ import { TimerWidget } from '@/components/timer/TimerWidget';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { BriefcaseIcon } from '@/components/nav/icons';
+import { BriefcaseIcon, MailIcon } from '@/components/nav/icons';
+import { IconButton } from '@/components/ui/IconButton';
 import { useToast } from '@/components/ui/Toast';
 import { EntryForm, EntryFormValues } from '@/components/entry/EntryForm';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useSessionTypes } from '@/hooks/useSessionTypes';
 import { useTimeEntries } from '@/hooks/useTimeEntries';
 import { formatAE, minutesToHHMM, minutesToAE } from '@/lib/ae';
+import { buildSessionMailto } from '@/lib/mail';
 import { TimeEntry } from '@/types';
 
 const formatEUR = (value: number): string =>
@@ -60,6 +62,14 @@ export default function DashboardPage() {
 
   const customerName = (id: string) => customers.find((c) => c.id === id)?.name ?? '—';
   const sessionTypeLabel = (id: string) => sessionTypes.find((s) => s.id === id)?.label ?? '—';
+
+  const sendByMail = (entry: TimeEntry) => {
+    window.location.href = buildSessionMailto(
+      entry,
+      customerName(entry.customer_id),
+      sessionTypeLabel(entry.session_type_id)
+    );
+  };
 
   const handleUpdate = async (values: EntryFormValues) => {
     if (!editingEntry) return;
@@ -190,7 +200,13 @@ export default function DashboardPage() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="flex shrink-0 gap-2">
+                  <div className="flex shrink-0 items-center gap-2">
+                    <IconButton
+                      label="Per E-Mail senden"
+                      onClick={() => sendByMail(entry)}
+                    >
+                      <MailIcon className="h-4 w-4" />
+                    </IconButton>
                     <Button size="sm" variant="secondary" onClick={() => setEditingEntry(entry)}>
                       Bearbeiten
                     </Button>

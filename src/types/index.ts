@@ -24,6 +24,8 @@ export interface TimeEntry {
   ended_at: string | null;
   created_at: string;
   updated_at: string;
+  /** Owner of the entry; filled in by the server (default auth.uid()). */
+  user_id?: string;
 }
 
 export interface SyncQueueItem {
@@ -35,12 +37,40 @@ export interface SyncQueueItem {
 }
 
 export interface TimerState {
-  key: 'active';
+  /** One uuid per timer; the legacy single timer used the fixed key 'active'. */
+  key: string;
   customer_id: string;
   session_type_id: string;
+  /** Start of the current running stretch (reset on resume). */
   started_at: string;
-  status: 'running' | 'paused';
+  /** Set once when the timer is created; used for stable ordering. */
+  created_at?: string;
+  status: 'running' | 'paused' | 'stopped';
   accumulated_seconds: number;
+  /** Rounded minutes frozen by "Stoppen", waiting to be saved or discarded. */
+  frozen_minutes?: number;
+}
+
+export type UserRole = 'admin' | 'user';
+
+export interface Profile {
+  id: string;
+  username: string | null;
+  role: UserRole;
+  disabled: boolean;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string | null;
+  username: string | null;
+  role: UserRole | null;
+  disabled: boolean;
+  has_profile: boolean;
+  providers: string[];
+  created_at: string;
+  last_sign_in_at: string | null;
+  entry_count: number;
 }
 
 export type SyncStatus = 'synced' | 'syncing' | 'offline' | 'error';

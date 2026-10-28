@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useSessionTypes } from '@/hooks/useSessionTypes';
+import { useProfile } from '@/hooks/useProfile';
 import { useToast } from '@/components/ui/Toast';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -15,6 +16,8 @@ export default function SettingsPage() {
   const { customers, addCustomer, updateCustomer, toggleActive, deleteCustomer } = useCustomers();
   const { sessionTypes, addSessionType, updateSessionType, deleteSessionType } = useSessionTypes();
   const { showToast } = useToast();
+  // Customers and session types are shared by all users, so only admins may delete them.
+  const { isAdmin } = useProfile();
 
   const [newName, setNewName] = useState('');
   const [newRate, setNewRate] = useState('');
@@ -190,13 +193,15 @@ export default function SettingsPage() {
                     >
                       <PowerIcon className="h-4 w-4" />
                     </IconButton>
-                    <IconButton
-                      label="Löschen"
-                      variant="danger"
-                      onClick={() => handleDeleteCustomer(c.id)}
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </IconButton>
+                    {isAdmin && (
+                      <IconButton
+                        label="Löschen"
+                        variant="danger"
+                        onClick={() => handleDeleteCustomer(c.id)}
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </IconButton>
+                    )}
                   </div>
                 </div>
               )
@@ -260,9 +265,11 @@ export default function SettingsPage() {
                     <IconButton label="Bearbeiten" onClick={() => startEditType(s.id, s.label)}>
                       <PencilIcon className="h-4 w-4" />
                     </IconButton>
-                    <IconButton label="Löschen" variant="danger" onClick={() => handleDeleteType(s.id)}>
-                      <TrashIcon className="h-4 w-4" />
-                    </IconButton>
+                    {isAdmin && (
+                      <IconButton label="Löschen" variant="danger" onClick={() => handleDeleteType(s.id)}>
+                        <TrashIcon className="h-4 w-4" />
+                      </IconButton>
+                    )}
                   </div>
                 </div>
               )

@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Logo } from '@/components/nav/Logo';
+import { identifierToEmail } from '@/lib/auth';
+import { LOGIN_NOTICE_KEY } from '@/hooks/useProfile';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,21 +16,41 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [githubLoading, setGithubLoading] = useState(false);
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) router.push('/');
     });
+
+    // Reason for a forced sign-out (disabled account, no access), if any.
+    try {
+      const stored = sessionStorage.getItem(LOGIN_NOTICE_KEY);
+      if (stored) {
+        setNotice(stored);
+        sessionStorage.removeItem(LOGIN_NOTICE_KEY);
+      }
+    } catch {
+      // storage unavailable: no notice
+    }
   }, [router]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    setNotice('');
     setLoading(true);
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: identifierToEmail(email),
+      password,
+    });
     setLoading(false);
     if (authError) {
-      setError('Anmeldung fehlgeschlagen. Bitte E-Mail und Passwort prüfen.');
+      setError(
+        authError.message.toLowerCase().includes('banned')
+          ? 'Dieses Konto wurde deaktiviert.'
+          : 'Anmeldung fehlgeschlagen. Bitte Benutzername/E-Mail und Passwort prüfen.'
+      );
       return;
     }
     router.push('/');
@@ -60,8 +82,12 @@ export default function LoginPage() {
       >
         <div className="mb-4">
           <Input
-            label="E-Mail"
-            type="email"
+            label="Benutzername oder E-Mail"
+            type="text"
+            autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             fullWidth
             required
             value={email}
@@ -82,6 +108,7 @@ export default function LoginPage() {
           {loading ? 'Wird angemeldet...' : 'Anmelden'}
         </Button>
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
+        {notice && <p className="mt-3 text-sm text-warning">{notice}</p>}
 
         <div className="my-4 flex items-center gap-3">
           <div className="h-px flex-1 bg-border" />

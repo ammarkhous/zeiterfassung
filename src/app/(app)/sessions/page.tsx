@@ -8,11 +8,13 @@ import { useToast } from '@/components/ui/Toast';
 import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { IconButton } from '@/components/ui/IconButton';
 import { MonthYearPicker } from '@/components/ui/MonthYearPicker';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { ListIcon } from '@/components/nav/icons';
+import { ListIcon, MailIcon } from '@/components/nav/icons';
 import { EntryForm, EntryFormValues } from '@/components/entry/EntryForm';
 import { minutesToAE, minutesToHHMM, formatAE } from '@/lib/ae';
+import { buildSessionMailto } from '@/lib/mail';
 import { TimeEntry } from '@/types';
 
 const PAGE_SIZE = 50;
@@ -43,6 +45,14 @@ export default function SessionsPage() {
 
   const customerName = (id: string) => customers.find((c) => c.id === id)?.name ?? '—';
   const sessionTypeLabel = (id: string) => sessionTypes.find((s) => s.id === id)?.label ?? '—';
+
+  const sendByMail = (entry: TimeEntry) => {
+    window.location.href = buildSessionMailto(
+      entry,
+      customerName(entry.customer_id),
+      sessionTypeLabel(entry.session_type_id)
+    );
+  };
 
   const filtered = useMemo(() => {
     return entries.filter((e) => {
@@ -180,7 +190,13 @@ export default function SessionsPage() {
                       : '—'}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2">
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
+                      <IconButton
+                        label="Per E-Mail senden"
+                        onClick={() => sendByMail(entry)}
+                      >
+                        <MailIcon className="h-4 w-4" />
+                      </IconButton>
                       <Button size="sm" variant="secondary" onClick={() => setEditingEntry(entry)}>
                         Bearbeiten
                       </Button>

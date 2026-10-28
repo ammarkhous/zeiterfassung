@@ -69,27 +69,40 @@ export const pullFromSupabase = async (): Promise<void> => {
   notifyDataChanged();
 };
 
-export const pushToSupabase = async (item: SyncQueueItem): Promise<boolean> => {
+export const SYNC_REJECTED_EVENT = 'zeiterfassung:sync-rejected';
+
+// ok       - pushed, remove from queue
+// retry    - network / auth / server trouble, keep in queue and try again later
+// rejected - the server will never accept this change (constraint or RLS
+//            violation); keeping it would block every later queue item
+type PushResult = 'ok' | 'retry' | 'rejected';
+
+// Postgres error classes that retrying can never fix: 22 data exception,
+// 23 integrity constraint violation, 42 syntax / insufficient privilege.
+const PERMANENT_ERROR_CODE = /^(22|23|42)/;
+
+export const pushToSupabase = async (item: SyncQueueItem): Promise<PushResult> => {
   try {
     const { table, operation, payload } = item;
+    let error: { code?: string; message?: string } | null = null;
 
     if (operation === 'insert') {
-      const { error } = await supabase.from(table).insert(payload);
-      if (error) throw error;
+      ({ error } = await supabase.from(table).insert(payload));
     } else if (operation === 'update') {
       const { id, ...rest } = payload as { id: string; [k: string]: unknown };
-      const { error } = await supabase.from(table).update(rest).eq('id', id);
-      if (error) throw error;
+      ({ error } = await supabase.from(table).update(rest).eq('id', id));
     } else if (operation === 'delete') {
       const { id } = payload as { id: string };
-      const { error } = await supabase.from(table).delete().eq('id', id);
-      if (error) throw error;
+      ({ error } = await supabase.from(table).delete().eq('id', id));
     }
 
-    return true;
+    if (!error) return 'ok';
+
+    console.error('Sync-Fehler beim Push zu Supabase:', error);
+    return error.code && PERMANENT_ERROR_CODE.test(error.code) ? 'rejected' : 'retry';
   } catch (err) {
     console.error('Sync-Fehler beim Push zu Supabase:', err);
-    return false;
+    return 'retry';
   }
 };
 
@@ -109,25 +122,66 @@ export const queueOperation = async (
   await db.put('sync_queue', item);
 };
 
-export const drainSyncQueue = async (): Promise<boolean> => {
-  if (!isOnline()) return false;
-
+// One pass over the queue, oldest first. Returns false when a retryable failure
+// stopped the pass (rejected items are dropped and do not count as failure).
+const drainOnce = async (): Promise<boolean> => {
   const db = await getDB();
   const items = await db.getAllFromIndex('sync_queue', 'by-timestamp');
 
+  let rejected = 0;
   let allSucceeded = true;
 
   for (const item of items) {
-    const success = await pushToSupabase(item);
-    if (success) {
-      await db.delete('sync_queue', item.id);
-    } else {
+    const result = await pushToSupabase(item);
+    if (result === 'retry') {
       allSucceeded = false;
       break;
     }
+    await db.delete('sync_queue', item.id);
+    if (result === 'rejected') rejected += 1;
+  }
+
+  if (rejected > 0 && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(SYNC_REJECTED_EVENT, { detail: { count: rejected } }));
+    // Bring the local copy back in line with what the server really holds.
+    pullFromSupabase().catch((err) => console.error('Pull nach abgelehnter Änderung fehlgeschlagen:', err));
   }
 
   return allSucceeded;
+};
+
+// Only one drain may run at a time; two concurrent passes would push the same
+// queue item twice (and the second insert would then look like a rejection).
+// A drain requested mid-run makes the running one do another pass, so writes
+// queued while it was working are not left behind.
+let draining: Promise<boolean> | null = null;
+let drainAgain = false;
+
+export const drainSyncQueue = (): Promise<boolean> => {
+  if (!isOnline()) return Promise.resolve(false);
+  if (draining) {
+    drainAgain = true;
+    return draining;
+  }
+
+  draining = (async () => {
+    try {
+      let allSucceeded = true;
+      for (;;) {
+        drainAgain = false;
+        if (!(await drainOnce())) {
+          allSucceeded = false;
+          break;
+        }
+        if (!drainAgain) break;
+      }
+      return allSucceeded;
+    } finally {
+      draining = null;
+    }
+  })();
+
+  return draining;
 };
 
 export const writeWithSync = async (

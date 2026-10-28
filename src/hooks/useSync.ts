@@ -6,11 +6,17 @@ import { getDB } from '@/lib/db';
 import { SyncStatus } from '@/types';
 import { useOnlineStatus } from './useOnlineStatus';
 
+// Customers and session types are shared between users, so changes made by
+// someone else must arrive without restarting the app. Coming back to the
+// window re-syncs, but at most this often.
+const FOCUS_SYNC_MIN_INTERVAL_MS = 60_000;
+
 export const useSync = () => {
   const isOnline = useOnlineStatus();
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('offline');
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
   const didInitialSync = useRef(false);
+  const lastSyncStartedAt = useRef(0);
 
   const checkQueueEmpty = useCallback(async () => {
     const db = await getDB();
@@ -24,6 +30,7 @@ export const useSync = () => {
       return;
     }
 
+    lastSyncStartedAt.current = Date.now();
     setSyncStatus('syncing');
     try {
       await pullFromSupabase();
@@ -75,6 +82,21 @@ export const useSync = () => {
     window.addEventListener('online', handleOnline);
     return () => window.removeEventListener('online', handleOnline);
   }, [checkQueueEmpty]);
+
+  useEffect(() => {
+    const syncOnReturn = () => {
+      if (document.visibilityState !== 'visible' || !navigator.onLine) return;
+      if (Date.now() - lastSyncStartedAt.current < FOCUS_SYNC_MIN_INTERVAL_MS) return;
+      triggerSync();
+    };
+
+    document.addEventListener('visibilitychange', syncOnReturn);
+    window.addEventListener('focus', syncOnReturn);
+    return () => {
+      document.removeEventListener('visibilitychange', syncOnReturn);
+      window.removeEventListener('focus', syncOnReturn);
+    };
+  }, [triggerSync]);
 
   useEffect(() => {
     if (!isOnline) {

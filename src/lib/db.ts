@@ -26,14 +26,27 @@ interface ZeiterfassungDB extends DBSchema {
   };
 }
 
-const DB_NAME = 'zeiterfassung-db';
+const BASE_DB_NAME = 'zeiterfassung-db';
 const DB_VERSION = 1;
 
+let dbName = BASE_DB_NAME;
 let dbPromise: Promise<IDBPDatabase<ZeiterfassungDB>> | null = null;
+
+// Every signed-in user gets a separate local database, so cached data and the
+// sync queue of one user are never visible to (or pushed by) another user on
+// the same device. Must be called before any hook touches the DB.
+export const setDbUser = (userId: string | null): void => {
+  const next = userId ? `${BASE_DB_NAME}-${userId}` : BASE_DB_NAME;
+  if (next === dbName) return;
+  dbName = next;
+  const previous = dbPromise;
+  dbPromise = null;
+  previous?.then((db) => db.close()).catch(() => {});
+};
 
 export const getDB = (): Promise<IDBPDatabase<ZeiterfassungDB>> => {
   if (!dbPromise) {
-    dbPromise = openDB<ZeiterfassungDB>(DB_NAME, DB_VERSION, {
+    dbPromise = openDB<ZeiterfassungDB>(dbName, DB_VERSION, {
       upgrade(db) {
         if (!db.objectStoreNames.contains('customers')) {
           db.createObjectStore('customers', { keyPath: 'id' });
