@@ -2,7 +2,14 @@
 
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { createUser, deleteUser, listUsers, setUserDisabled, setUserPassword } from '@/lib/adminApi';
+import {
+  createUser,
+  deleteUser,
+  listUsers,
+  resetUserMfa,
+  setUserDisabled,
+  setUserPassword,
+} from '@/lib/adminApi';
 import { useProfile } from '@/hooks/useProfile';
 import { useToast } from '@/components/ui/Toast';
 import { Input } from '@/components/ui/Input';
@@ -38,6 +45,7 @@ export default function AdminPage() {
   const [passwordTarget, setPasswordTarget] = useState<AdminUser | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
+  const [mfaTarget, setMfaTarget] = useState<AdminUser | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -100,6 +108,20 @@ export default function AdminPage() {
     reload();
   };
 
+  const handleResetMfa = async () => {
+    if (!mfaTarget) return;
+    setBusy(true);
+    const result = await resetUserMfa(mfaTarget.id);
+    setBusy(false);
+    if (!result.ok) {
+      showToast(result.error, 'error');
+      return;
+    }
+    setMfaTarget(null);
+    showToast('MFA zurückgesetzt', 'success');
+    reload();
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setBusy(true);
@@ -156,12 +178,12 @@ export default function AdminPage() {
             required
           />
           <Input
-            label="Passwort * (min. 8 Zeichen)"
+            label="Passwort * (min. 12 Zeichen)"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="new-password"
-            minLength={8}
+            minLength={12}
             required
           />
           <Select label="Rolle" value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
@@ -213,6 +235,11 @@ export default function AdminPage() {
                       {user.role === 'admin' && <Badge variant="success">Administrator</Badge>}
                       {user.disabled && <Badge variant="danger">Deaktiviert</Badge>}
                       {!user.has_profile && <Badge variant="warning">Kein Zugang</Badge>}
+                      {user.has_profile && (
+                        <Badge variant={user.mfa_enabled ? 'success' : 'warning'}>
+                          {user.mfa_enabled ? 'MFA aktiv' : 'MFA fehlt'}
+                        </Badge>
+                      )}
                     </div>
                     <p className="truncate text-xs text-text-muted">
                       {user.username && user.email ? `${user.email} · ` : ''}
@@ -230,6 +257,11 @@ export default function AdminPage() {
                     >
                       <KeyIcon className="h-4 w-4" />
                     </IconButton>
+                    {user.mfa_enabled && (
+                      <IconButton label="MFA zurücksetzen" onClick={() => setMfaTarget(user)}>
+                        <ShieldIcon className="h-4 w-4" />
+                      </IconButton>
+                    )}
                     {user.has_profile && !isSelf && (
                       <IconButton
                         label={user.disabled ? 'Aktivieren' : 'Deaktivieren'}
@@ -260,12 +292,12 @@ export default function AdminPage() {
       >
         <form onSubmit={handleSetPassword} className="flex flex-col gap-4">
           <Input
-            label="Neues Passwort (min. 8 Zeichen)"
+            label="Neues Passwort (min. 12 Zeichen)"
             type="password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             autoComplete="new-password"
-            minLength={8}
+            minLength={12}
             required
             fullWidth
           />
@@ -299,6 +331,26 @@ export default function AdminPage() {
                 Löschen
               </Button>
               <Button variant="secondary" onClick={() => setDeleteTarget(null)}>
+                Abbrechen
+              </Button>
+            </div>
+          </>
+        )}
+      </Modal>
+
+      <Modal open={!!mfaTarget} onClose={() => setMfaTarget(null)} title="MFA zurücksetzen">
+        {mfaTarget && (
+          <>
+            <p className="mb-4 text-sm text-text">
+              Der Authenticator von <span className="font-semibold">{displayName(mfaTarget)}</span> wird
+              entfernt, zum Beispiel weil das Handy verloren ging. Der Benutzer wird überall abgemeldet
+              und richtet beim nächsten Anmelden einen neuen Authenticator ein.
+            </p>
+            <div className="flex gap-2">
+              <Button variant="danger" onClick={handleResetMfa} disabled={busy}>
+                Zurücksetzen
+              </Button>
+              <Button variant="secondary" onClick={() => setMfaTarget(null)}>
                 Abbrechen
               </Button>
             </div>

@@ -90,6 +90,45 @@ IndexedDB-Datenbank: `zeiterfassung-db-<userId>` (Version 2), **eine pro Benutze
 - **Bekannte Einschränkung:** Der AE-Satz liegt am (geteilten) Kunden, nicht am Eintrag. Eine
   Änderung wirkt rückwirkend auf alle Berichte aller Benutzer.
 
+## Sicherheit & Zwei-Faktor-Anmeldung (MFA)
+
+**MFA (TOTP, Authenticator-App) ist für alle Benutzer Pflicht.** `MfaGate` (`src/components/auth/`) sitzt in
+`(app)/layout.tsx` zwischen Anmeldung und App: `aal2` → App; `aal1` mit bestätigtem Faktor → Code-Abfrage
+(`MfaChallenge`); `aal1` ohne Faktor → Einrichtung ohne „Überspringen“ (`MfaSetup`, QR-Code + Schlüssel).
+Das Aal-Level wird lokal aus dem Session-Token gelesen, die App startet mit `aal2` also auch offline.
+Hilfsfunktionen in `src/lib/mfa.ts`. Einstellungen → „Sicherheit“ (`SecuritySettings`): weiteres Gerät
+hinzufügen, Authenticator entfernen (der letzte nicht). Es gibt keine Recovery-Codes (Supabase hat keine).
+
+- **Handy verloren:** Administrator → Admin-Tab → „MFA zurücksetzen“ (Edge Function `resetMfa`, löscht alle
+  Faktoren, meldet den Benutzer überall ab; neue Einrichtung bei der nächsten Anmeldung). Verliert der **einzige**
+  Administrator sein Handy: im Supabase SQL Editor `delete from auth.mfa_factors where user_id = '<id>';`.
+- **Durchsetzung in der Datenbank (Rollout-Schritt C, NICHT automatisch angewendet):** Ohne sie gilt MFA nur in
+  der App-Oberfläche; wer Passwort + API hat, könnte mit einem `aal1`-Token Daten lesen. Reihenfolge: **A** Code
+  deployen → **B** jeder Benutzer meldet sich einmal an und richtet MFA ein (Administrator zuerst; die Vorabfrage
+  steht im Kopf von `supabase/mfa_enforcement.sql`) → **C** `supabase/mfa_enforcement.sql` anwenden (restriktive
+  RLS-Policies auf `auth.jwt()->>'aal'`) und Function-Secret `REQUIRE_AAL2=true` setzen. Vorher anwenden sperrt
+  jede Sitzung ohne MFA aus, auch alte, im Cache liegende App-Versionen. Rückgängig: die fünf „require aal2“-Policies droppen.
+- **Datenbankrechte:** `anon` hat auf keine Tabelle Zugriff; `authenticated` nur SELECT/INSERT/UPDATE/DELETE
+  (kein TRUNCATE/TRIGGER/REFERENCES, denn TRUNCATE umgeht RLS), `profiles` nur SELECT (geschrieben wird nur über
+  die Edge Function). `rls_auto_enable()` ist nicht per API aufrufbar. Steht auch in `supabase/schema.sql`.
+- **Passwörter:** mindestens 12 Zeichen (Edge Function erzwingt es, Formulare spiegeln es).
+- **Service Worker:** Antworten der Supabase-API (`/rest|auth|functions|storage|realtime/v1/`) laufen immer
+  `NetworkOnly`. Serwists `defaultCache` würde sonst jede Cross-Origin-GET-Antwort (Kunden, Einträge,
+  Unterschriften) in den Cache Storage schreiben, wo sie nach dem Abmelden lesbar bleibt. Offline-Daten
+  kommen nur aus IndexedDB.
+- **CSP:** `<meta http-equiv="Content-Security-Policy">` in `src/app/layout.tsx` (nur Production-Build; GitHub
+  Pages kann keine Header senden). `connect-src` ist auf die App und das Supabase-Projekt beschränkt, `object-src`,
+  `frame-src` auf `none`. `'unsafe-inline'` braucht Next, `'unsafe-eval'` braucht `docx-templates`. Neue externe
+  Dienste müssen hier eingetragen werden, sonst blockt der Browser sie. `Referrer-Policy`: `no-referrer`.
+  `frame-ancestors`/`X-Frame-Options` lassen sich per Meta-Tag nicht setzen (Clickjacking-Schutz fehlt auf Pages).
+- **Keine Drittanbieter-Übertragung von Inhalten:** Notizen werden nicht mehr automatisch übersetzt (früher
+  Google-Translate-Endpunkt); sie verlassen die App nur Richtung Supabase.
+- **Nicht in der Hand des Codes, im Supabase-Dashboard zu setzen:** „Allow new users to sign up“ ausschalten,
+  GitHub-Provider abschalten, „Leaked password protection“ einschalten (laut Supabase ggf. Pro-Plan),
+  JWT-Laufzeit/Inactivity-Timeout nach Bedarf.
+- **Bekannte Designgrenze:** Kunden und Typen sind für alle aktiven Benutzer änderbar (nur Löschen ist Admin-only);
+  ein Benutzer kann also AE-Sätze ändern, die für alle gelten.
+
 ## Timer
 
 Mehrere Timer gleichzeitig (`src/hooks/useTimers.ts`, `src/components/timer/TimerCard.tsx`). Jeder Timer
@@ -219,7 +258,7 @@ src/
     report/    ReportTable.tsx, ExportButtons.tsx, SessionExportButtons.tsx, AllWorkReport.tsx, CustomerReports.tsx
     signature/ SignaturePad.tsx, SignatureModal.tsx
     ui/        Button.tsx, Input.tsx, Select.tsx, Modal.tsx, Badge.tsx, Toast.tsx, IconButton.tsx, ...
-  lib/         supabase.ts, db.ts, ae.ts, sync.ts, export.ts, pdf.ts, reportRows.ts, mail.ts, auth.ts, adminApi.ts, translate.ts
+  lib/         supabase.ts, db.ts, ae.ts, sync.ts, export.ts, pdf.ts, reportRows.ts, mail.ts, auth.ts, adminApi.ts, mfa.ts
   hooks/       useCustomers.ts, useSessionTypes.ts, useTimeEntries.ts, useTimers.ts, useSync.ts,
                useOnlineStatus.ts, useProfile.tsx
   types/       index.ts
@@ -260,11 +299,11 @@ Auth-Dashboard manuell einen Benutzer-Account anlegen (keine Registrierungs-UI i
 **Aktuelles Projekt:** `rlctnbqytjphyfetzxxm` (eu-west-1) — Schema bereits angewendet,
 `.env.local` bereits mit URL/Anon-Key befüllt.
 
-**Login:** Benutzername oder E-Mail + Passwort (`supabase.auth.signInWithPassword`) sowie optional GitHub OAuth
-(`supabase.auth.signInWithOAuth({ provider: 'github' })`). Für GitHub-Login: eine GitHub OAuth
-App unter github.com/settings/developers anlegen (Callback-URL:
-`https://rlctnbqytjphyfetzxxm.supabase.co/auth/v1/callback`), Client-ID/Secret im Supabase
-Dashboard unter Authentication → Providers → GitHub eintragen.
+**Login:** ausschließlich Benutzername oder E-Mail + Passwort (`supabase.auth.signInWithPassword`). Der
+frühere „Mit GitHub anmelden“-Button wurde aus der Oberfläche entfernt. Der GitHub-Provider ist im Supabase
+Dashboard (Authentication → Providers → GitHub) vermutlich noch aktiviert: wer ihn ganz abschalten will,
+muss ihn dort ausschalten (ein bestehendes GitHub-Konto könnte sonst weiter über die OAuth-URL anmelden).
+Benutzer legt der Administrator im Admin-Tab an.
 
 ## PWA-Installation
 

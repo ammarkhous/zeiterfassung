@@ -95,6 +95,8 @@ export interface AdminUser {
   role: UserRole | null;
   disabled: boolean;
   has_profile: boolean;
+  /** At least one verified authenticator (TOTP) is set up. */
+  mfa_enabled: boolean;
   providers: string[];
   created_at: string;
   last_sign_in_at: string | null;

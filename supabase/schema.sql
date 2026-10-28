@@ -184,3 +184,15 @@ create trigger report_templates_updated_at before update on report_templates for
 --   insert into profiles (id, role) values ('<auth user id>', 'admin');
 -- Further users are created in the app's Admin tab (edge function admin-users,
 -- see supabase/functions/admin-users).
+
+-- Hardening (defense in depth on top of RLS). Supabase grants the API roles every table
+-- privilege by default; the app needs far less. TRUNCATE is not covered by RLS at all.
+revoke all on profiles, customers, session_types, time_entries, report_templates from anon;
+revoke truncate, trigger, references on profiles, customers, session_types, time_entries, report_templates from authenticated;
+revoke insert, update, delete on profiles from authenticated;  -- profiles is written by the edge function only
+alter default privileges for role postgres in schema public revoke all on tables from anon;
+alter default privileges for role postgres in schema public revoke all on functions from anon;
+alter default privileges for role postgres in schema public revoke all on sequences from anon;
+-- Supabase's event-trigger helper must not be callable through the API (only exists on hosted projects):
+-- revoke execute on function public.rls_auto_enable() from public, anon, authenticated;
+-- Two-factor enforcement in the database is a separate, deliberate step: supabase/mfa_enforcement.sql.

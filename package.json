@@ -15,7 +15,7 @@
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "jszip": "^3.10.2",
-    "next": "15.5.25",
+    "next": "15.5.28",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "serwist": "^9.5.12"
@@ -29,7 +29,7 @@
     "@types/react-dom": "^19",
     "canvas": "^3.2.3",
     "eslint": "^9",
-    "eslint-config-next": "15.5.25",
+    "eslint-config-next": "15.5.28",
     "tailwindcss": "^4.3.3",
     "typescript": "^5"
   }

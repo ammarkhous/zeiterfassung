@@ -4,11 +4,9 @@ import { useState } from 'react';
 import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { DatePicker } from '@/components/ui/DatePicker';
-import { useToast } from '@/components/ui/Toast';
 import { AEInput } from './AEInput';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useSessionTypes } from '@/hooks/useSessionTypes';
-import { translateToGerman } from '@/lib/translate';
 
 export interface EntryFormValues {
   customer_id: string;
@@ -48,30 +46,6 @@ export const EntryForm = ({
   const [durationMinutes, setDurationMinutes] = useState(initialValues?.duration_minutes ?? 0);
   const [notes, setNotes] = useState(initialValues?.notes ?? '');
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [translating, setTranslating] = useState(false);
-  const { showToast } = useToast();
-
-  // Returns the final (possibly translated) notes text. Always awaited before a
-  // save actually happens (see handleSubmit) so a save can never race ahead of
-  // the async translation and persist the untranslated original - onBlur alone
-  // isn't reliable, since a Save click right after editing notes can fire before
-  // the blur-triggered translation resolves.
-  const translateNotesIfNeeded = async (currentNotes: string): Promise<string> => {
-    if (!currentNotes.trim()) return currentNotes;
-    setTranslating(true);
-    const translated = await translateToGerman(currentNotes);
-    setTranslating(false);
-    if (translated) {
-      setNotes(translated);
-      showToast('Beschreibung automatisch ins Deutsche übersetzt', 'success');
-      return translated;
-    }
-    return currentNotes;
-  };
-
-  const handleNotesBlur = () => {
-    translateNotesIfNeeded(notes);
-  };
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -86,13 +60,12 @@ export const EntryForm = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    const finalNotes = await translateNotesIfNeeded(notes);
     await onSubmit({
       customer_id: customerId,
       session_type_id: sessionTypeId,
       entry_date: entryDate,
       duration_minutes: durationMinutes,
-      notes: finalNotes,
+      notes,
     });
   };
 
@@ -145,13 +118,9 @@ export const EntryForm = ({
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          onBlur={handleNotesBlur}
           rows={4}
           className="w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-base text-text outline-none focus:border-accent focus:ring-1 focus:ring-accent"
         />
-        {translating && (
-          <p className="mt-1 text-xs text-text-muted">Übersetzung wird geprüft...</p>
-        )}
       </div>
 
       <div className="flex gap-2">

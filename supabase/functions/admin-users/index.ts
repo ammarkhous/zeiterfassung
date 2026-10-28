@@ -7,8 +7,26 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 const SYNTHETIC_EMAIL_DOMAIN = 'users.zeiterfassung.local';
 const USERNAME_PATTERN = /^[a-z0-9._-]{3,32}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MIN_PASSWORD_LENGTH = 8;
+const MIN_PASSWORD_LENGTH = 12;
 const BAN_FOREVER = '876000h';
+
+// Phase C of the MFA rollout: when set to "true" (function secret), an admin must have
+// passed the authenticator check (JWT claim aal = aal2) to use any action. Off by
+// default so an admin who has not set up an authenticator yet is not locked out of
+// the Admin tab while everybody enrolls.
+const REQUIRE_AAL2 = Deno.env.get('REQUIRE_AAL2') === 'true';
+
+// Assurance level claim of the caller's access token. Only read after getUser() has
+// validated the token with the auth server, so the payload can be trusted.
+const aalOf = (authHeader: string): string | null => {
+  try {
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof payload.aal === 'string' ? payload.aal : null;
+  } catch {
+    return null;
+  }
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -68,6 +86,9 @@ Deno.serve(async (req: Request) => {
     data: { user: caller },
   } = await callerClient.auth.getUser();
   if (!caller) return fail('Nicht angemeldet.', 401);
+  if (REQUIRE_AAL2 && aalOf(authHeader) !== 'aal2') {
+    return fail('Bitte zuerst mit dem Authenticator bestätigen.', 403);
+  }
 
   const { data: callerProfile } = await admin
     .from('profiles')
@@ -111,6 +132,7 @@ Deno.serve(async (req: Request) => {
         role: profile?.role ?? null,
         disabled: profile?.disabled ?? false,
         has_profile: !!profile,
+        mfa_enabled: (u.factors ?? []).some((f) => f.status === 'verified'),
         providers: (u.app_metadata?.providers as string[] | undefined) ?? [],
         created_at: u.created_at,
         last_sign_in_at: u.last_sign_in_at ?? null,
@@ -183,6 +205,20 @@ Deno.serve(async (req: Request) => {
     const { error } = await admin.auth.admin.updateUserById(userId, { password });
     if (error) return fail(translateAuthError(error.message));
     return json({ ok: true });
+  }
+
+  // Lost phone: remove every authenticator of the user. Deleting a verified factor also
+  // signs them out everywhere; at the next sign-in they set up a new authenticator.
+  if (action === 'resetMfa') {
+    const { data, error: listError } = await admin.auth.admin.mfa.listFactors({ userId });
+    if (listError) return fail(translateAuthError(listError.message), 500);
+    let removed = 0;
+    for (const factor of data.factors) {
+      const { error: deleteError } = await admin.auth.admin.mfa.deleteFactor({ id: factor.id, userId });
+      if (deleteError) return fail(translateAuthError(deleteError.message), 500);
+      removed += 1;
+    }
+    return json({ ok: true, removed });
   }
 
   if (action === 'setDisabled') {

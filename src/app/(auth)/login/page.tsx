@@ -15,7 +15,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [githubLoading, setGithubLoading] = useState(false);
   const [notice, setNotice] = useState('');
 
   useEffect(() => {
@@ -54,20 +53,6 @@ export default function LoginPage() {
       return;
     }
     router.push('/');
-  };
-
-  const handleGithubLogin = async () => {
-    setError('');
-    setGithubLoading(true);
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-    const { error: authError } = await supabase.auth.signInWithOAuth({
-      provider: 'github',
-      options: { redirectTo: `${window.location.origin}${basePath}/` },
-    });
-    if (authError) {
-      setGithubLoading(false);
-      setError('GitHub-Anmeldung fehlgeschlagen.');
-    }
   };
 
   return (
@@ -109,22 +94,6 @@ export default function LoginPage() {
         </Button>
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
         {notice && <p className="mt-3 text-sm text-warning">{notice}</p>}
-
-        <div className="my-4 flex items-center gap-3">
-          <div className="h-px flex-1 bg-border" />
-          <span className="text-xs text-text-muted">oder</span>
-          <div className="h-px flex-1 bg-border" />
-        </div>
-
-        <Button
-          type="button"
-          variant="secondary"
-          fullWidth
-          disabled={githubLoading}
-          onClick={handleGithubLogin}
-        >
-          {githubLoading ? 'Weiterleitung...' : 'Mit GitHub anmelden'}
-        </Button>
       </form>
     </div>
   );

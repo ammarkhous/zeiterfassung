@@ -8,6 +8,7 @@ import { SYNC_REJECTED_EVENT } from '@/lib/sync';
 import { TopNav } from '@/components/nav/TopNav';
 import { useSync } from '@/hooks/useSync';
 import { ProfileProvider } from '@/hooks/useProfile';
+import { MfaGate } from '@/components/auth/MfaGate';
 import { ToastProvider, useToast } from '@/components/ui/Toast';
 
 // Everything below this point may use the local database, the sync engine and
@@ -83,10 +84,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <ProfileProvider userId={userId}>
-      <ToastProvider>
-        <AppShell>{children}</AppShell>
-      </ToastProvider>
-    </ProfileProvider>
+    <MfaGate>
+      <ProfileProvider userId={userId}>
+        <ToastProvider>
+          <AppShell>{children}</AppShell>
+        </ToastProvider>
+      </ProfileProvider>
+    </MfaGate>
   );
 }

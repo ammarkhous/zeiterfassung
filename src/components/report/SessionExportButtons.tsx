@@ -10,11 +10,11 @@ import { buildSessionRow } from '@/lib/reportRows';
 import { buildSessionTemplateData } from '@/lib/templateData';
 import { renderWordReport } from '@/lib/wordExport';
 import {
-  buildGermanNotesMap,
   buildReportCsv,
   buildSessionTxt,
   downloadBlob,
   downloadTextFile,
+  noteText,
   sessionFileBaseName,
 } from '@/lib/export';
 
@@ -41,16 +41,9 @@ export const SessionExportButtons = ({
   const baseName = sessionFileBaseName(entry, customer.name);
   const row = buildSessionRow(entry, customer);
 
-  // Same German-note handling as the monthly exports.
-  const germanNote = async (): Promise<string> => {
-    if (!entry.notes) return '';
-    const map = await buildGermanNotesMap([row]);
-    return map.get(entry.notes) ?? entry.notes;
-  };
-
   const run = async (kind: ExportKind, build: (note: string) => void | Promise<void>) => {
     setExporting(kind);
-    await build(await germanNote());
+    await build(noteText(entry.notes));
     setExporting(null);
   };
 

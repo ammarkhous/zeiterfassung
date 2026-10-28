@@ -40,5 +40,9 @@ export const setUserPassword = (userId: string, password: string) =>
 export const setUserDisabled = (userId: string, disabled: boolean) =>
   call<{ ok: true }>({ action: 'setDisabled', user_id: userId, disabled });
 
+// Lost phone: removes all authenticators of the user (they set up a new one at the next sign-in).
+export const resetUserMfa = (userId: string) =>
+  call<{ ok: true; removed: number }>({ action: 'resetMfa', user_id: userId });
+
 export const deleteUser = (userId: string) =>
   call<{ ok: true }>({ action: 'delete', user_id: userId });

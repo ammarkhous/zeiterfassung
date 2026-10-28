@@ -1,7 +1,6 @@
 import { MonthlyReportRow, TimeEntry } from '@/types';
 import { minutesToAE, minutesToHHMM } from '@/lib/ae';
 import { GERMAN_MONTHS } from '@/lib/germanMonths';
-import { translateToGerman } from '@/lib/translate';
 import {
   formatKm,
   formatMaterialLine,
@@ -35,26 +34,8 @@ export const sessionFileBaseName = (entry: TimeEntry, customerName: string): str
   return `Session_${safeFilePart(customerName)}_${entry.entry_date}${time}`;
 };
 
-// Notes are translated to German once per distinct text, so a report shows them
-// the same way they were entered or auto-translated. Untranslatable notes (or no
-// connection) simply keep their original text.
-export const buildGermanNotesMap = async (rows: MonthlyReportRow[]): Promise<Map<string, string>> => {
-  const uniqueNotes = new Set<string>();
-  for (const row of rows) {
-    for (const entry of row.entries) {
-      if (entry.notes) uniqueNotes.add(entry.notes);
-    }
-  }
-
-  const map = new Map<string, string>();
-  await Promise.all(
-    Array.from(uniqueNotes).map(async (note) => {
-      const translated = await translateToGerman(note);
-      if (translated) map.set(note, translated);
-    })
-  );
-  return map;
-};
+// Notes are exported exactly as entered (they never leave the app for translation).
+export const noteText = (notes: string | null): string => notes ?? '';
 
 // Semicolon-separated (German Excel standard). A single session is just a report
 // with one row and one entry, so all CSV exports share this builder.

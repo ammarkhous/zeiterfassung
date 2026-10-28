@@ -7,7 +7,6 @@ import { SessionExtras, TimerView } from '@/hooks/useTimers';
 import { DraftMaterial, MaterialFahrtFields } from '@/components/entry/MaterialFahrtFields';
 import { normalizeMaterials, parseKm } from '@/lib/materials';
 import { minutesToAE, minutesToHHMM } from '@/lib/ae';
-import { translateToGerman } from '@/lib/translate';
 
 const formatHHMMSS = (totalSeconds: number): string => {
   const h = Math.floor(totalSeconds / 3600);
@@ -40,7 +39,6 @@ export const TimerCard = ({
   const { showToast } = useToast();
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
-  const [translating, setTranslating] = useState(false);
   // Optional on-site extras; like the note, only kept while this card is open.
   const [materials, setMaterials] = useState<DraftMaterial[]>([]);
   const [kmText, setKmText] = useState('');
@@ -51,24 +49,6 @@ export const TimerCard = ({
   const isStopped = timer.status === 'stopped';
   const elapsedSeconds = timer.elapsedSeconds;
 
-  // Returns the final (possibly translated) notes text. Always awaited before a
-  // save actually happens (see handleSave) so a save can never race ahead of the
-  // async translation and persist the untranslated original - onBlur alone isn't
-  // reliable, since a Save click right after editing notes can fire before the
-  // blur-triggered translation resolves.
-  const translateNotesIfNeeded = async (currentNotes: string): Promise<string> => {
-    if (!currentNotes.trim()) return currentNotes;
-    setTranslating(true);
-    const translated = await translateToGerman(currentNotes);
-    setTranslating(false);
-    if (translated) {
-      setNotes(translated);
-      showToast('Beschreibung automatisch ins Deutsche übersetzt', 'success');
-      return translated;
-    }
-    return currentNotes;
-  };
-
   const handleSave = async () => {
     const km = parseKm(kmText);
     if (!km.ok) {
@@ -78,8 +58,7 @@ export const TimerCard = ({
     setKmError(undefined);
 
     setSaving(true);
-    const finalNotes = await translateNotesIfNeeded(notes);
-    await onSave(timer.frozen_minutes ?? 1, finalNotes, {
+    await onSave(timer.frozen_minutes ?? 1, notes, {
       materials: normalizeMaterials(materials),
       travel_km: km.km,
     });
@@ -90,10 +69,6 @@ export const TimerCard = ({
   const handleDiscard = async () => {
     await onDiscard();
     showToast('Session verworfen');
-  };
-
-  const handleNotesBlur = () => {
-    translateNotesIfNeeded(notes);
   };
 
   if (isStopped) {
@@ -114,14 +89,10 @@ export const TimerCard = ({
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            onBlur={handleNotesBlur}
             placeholder="Notizen / Beschreibung (optional, erscheint auf der Abrechnung)..."
             rows={3}
             className="w-full rounded-xl border border-border bg-surface-2 px-4 py-2.5 text-base text-text outline-none focus:border-accent focus:ring-1 focus:ring-accent"
           />
-          {translating && (
-            <p className="mt-1 text-xs text-text-muted">Übersetzung wird geprüft...</p>
-          )}
         </div>
         <MaterialFahrtFields
           materials={materials}

@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 import { defaultCache } from '@serwist/next/worker';
-import { Serwist } from 'serwist';
+import { NetworkOnly, Serwist } from 'serwist';
 import type { PrecacheEntry, SerwistGlobalConfig } from 'serwist';
 
 declare global {
@@ -19,7 +19,16 @@ const serwist = new Serwist({
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
-  runtimeCaching: defaultCache,
+  runtimeCaching: [
+    // defaultCache stores every cross-origin GET, which would copy customer data, time
+    // entries and signature images from the Supabase API into Cache Storage (readable on
+    // the device after sign-out). Offline data comes from IndexedDB, never from this cache.
+    {
+      matcher: ({ url }) => /^\/(rest|auth|functions|storage|realtime)\/v1\//.test(url.pathname),
+      handler: new NetworkOnly(),
+    },
+    ...defaultCache,
+  ],
   fallbacks: {
     entries: [
       {

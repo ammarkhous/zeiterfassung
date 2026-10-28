@@ -4,6 +4,7 @@ import { FormEvent, useState } from 'react';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useSessionTypes } from '@/hooks/useSessionTypes';
 import { useProfile } from '@/hooks/useProfile';
+import { SecuritySettings } from '@/components/settings/SecuritySettings';
 import { useToast } from '@/components/ui/Toast';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -277,6 +278,8 @@ export default function SettingsPage() {
           </div>
         )}
       </section>
+
+      <SecuritySettings />
     </div>
   );
 }

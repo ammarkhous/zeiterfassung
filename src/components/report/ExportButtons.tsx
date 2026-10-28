@@ -10,11 +10,11 @@ import { buildReportPdf } from '@/lib/pdf';
 import { buildMonthlyTemplateData } from '@/lib/templateData';
 import { renderWordReport } from '@/lib/wordExport';
 import {
-  buildGermanNotesMap,
   buildReportCsv,
   buildReportTxt,
   downloadBlob,
   downloadTextFile,
+  noteText,
 } from '@/lib/export';
 
 interface ExportButtonsProps {
@@ -46,14 +46,9 @@ export const ExportButtons = ({
   const { showToast } = useToast();
   const technicianName = username ?? email ?? 'Techniker';
 
-  const prepareNotes = async () => {
-    const germanNotes = await buildGermanNotesMap(rows);
-    return (notes: string | null) => (notes ? germanNotes.get(notes) ?? notes : '');
-  };
-
   const handleMainExport = async () => {
     setExporting('main');
-    const noteFor = await prepareNotes();
+    const noteFor = noteText;
 
     if (hasTemplate) {
       try {
@@ -76,16 +71,14 @@ export const ExportButtons = ({
 
   const handleCsvExport = async () => {
     setExporting('csv');
-    const noteFor = await prepareNotes();
-    downloadTextFile(buildReportCsv(rows, sessionTypeLabel, noteFor), `${fileBaseName}.csv`, 'text/csv');
+    downloadTextFile(buildReportCsv(rows, sessionTypeLabel, noteText), `${fileBaseName}.csv`, 'text/csv');
     setExporting(null);
   };
 
   const handleTxtExport = async () => {
     setExporting('txt');
-    const noteFor = await prepareNotes();
     downloadTextFile(
-      buildReportTxt(rows, year, month, sessionTypeLabel, noteFor),
+      buildReportTxt(rows, year, month, sessionTypeLabel, noteText),
       `${fileBaseName}.txt`,
       'text/plain'
     );
