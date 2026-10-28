@@ -26,6 +26,10 @@ export interface TimeEntry {
   updated_at: string;
   /** Owner of the entry; filled in by the server (default auth.uid()). */
   user_id?: string;
+  /** Optional finger signatures as PNG data URLs, captured right after a timer session. */
+  technician_signature?: string | null;
+  customer_signature?: string | null;
+  signed_at?: string | null;
 }
 
 export interface SyncQueueItem {

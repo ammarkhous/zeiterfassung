@@ -8,24 +8,26 @@ interface ModalProps {
   onClose: () => void;
   title?: string;
   children: ReactNode;
+  /** When false, backdrop clicks and Escape do not close the modal (e.g. while drawing a signature). */
+  dismissible?: boolean;
 }
 
-export const Modal = ({ open, onClose, title, children }: ModalProps) => {
+export const Modal = ({ open, onClose, title, children, dismissible = true }: ModalProps) => {
   useEffect(() => {
-    if (!open) return;
+    if (!open || !dismissible) return;
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [open, onClose]);
+  }, [open, onClose, dismissible]);
 
   if (!open || typeof document === 'undefined') return null;
 
   return createPortal(
     <div
       className="fixed inset-0 z-50 overflow-y-auto bg-black/60 p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]"
-      onClick={onClose}
+      onClick={dismissible ? onClose : undefined}
     >
       <div
         className="mx-auto w-full max-w-lg rounded-3xl border border-border bg-surface p-6 shadow-sm"

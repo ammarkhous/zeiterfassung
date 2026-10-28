@@ -97,11 +97,33 @@ ist ein Datensatz in `timer_state` (Schlüssel = uuid) mit Status `running` | `p
 gestoppter, noch nicht gespeicherter Timer überlebt einen Reload. Timer sind lokal pro Gerät und Benutzer
 und werden nicht synchronisiert.
 
+## Unterschriften
+
+Nach „Speichern“ eines Timer-Sessions (nicht bei manuellen Einträgen, nicht bei „Verwerfen“) öffnet
+`TimerWidget` den `SignatureModal` (`src/components/signature/`). Die Session ist zu diesem Zeitpunkt
+schon gespeichert. Drei Schritte: **Übersicht** (alle Details und die kompletten Notizen, damit beide
+sehen, was sie unterschreiben), **Unterschrift Techniker**, **Unterschrift Kunde**. Jeder Schritt ist
+überspringbar; werden beide übersprungen, bleibt die Session unsigniert. Eine spätere Unterschrift ist
+nicht vorgesehen. Das Modal ist nicht per Hintergrund-Klick/Escape schließbar (`Modal dismissible=false`),
+sonst würde ein Wischer über den Rand die Unterschrift verwerfen.
+
+- **Speicherung:** Spalten `technician_signature`, `customer_signature` (PNG-Data-URL, 480×160, 3:1,
+  transparent) und `signed_at` an `time_entries`; Check-Constraint: PNG-Data-URL, max. 100000 Zeichen.
+  Sync unverändert (`updateEntry` → `writeWithSync`), keine IndexedDB-Versionsänderung.
+- **PDF:** `src/lib/pdf.ts` (`buildReportPdf`). Signierte Sessions bekommen in derselben Tabellenzeile
+  unter der Notiz einen Unterschriftenbereich („Techniker“, „Kunde“, „keine Unterschrift“, Datum), die
+  Zeile wird nie über einen Seitenumbruch geteilt. CSV/TXT/Mail enthalten keine Unterschriften.
+- **Größe:** `select('*')` lädt die Bilder bei jedem Pull mit. Bei sehr vielen signierten Sessions wäre
+  ein inkrementeller Pull (`updated_at`) oder Supabase Storage die Lösung.
+
 ## Export & Versand
 
 Abrechnung als PDF, CSV (Semikolon, UTF-8 mit BOM) und TXT (`src/lib/export.ts`). Pro Session gibt es
-einen E-Mail-Button, der das Standard-Mailprogramm per `mailto:` ohne Empfänger öffnet
-(`src/lib/mail.ts`; lange Notizen werden gekürzt, damit die URL funktioniert).
+einen E-Mail-Button (`src/lib/mail.ts`), der immer eine TXT-Datei mit der kompletten Session samt
+vollständigen Notizen erzeugt. Touch-Geräte öffnen das Teilen-Menü mit der Datei als Anhang. Auf dem
+Desktop wird die Datei heruntergeladen und das Standard-Mailprogramm per `mailto:` ohne Empfänger
+geöffnet (ein `mailto:` kann keine Anhänge enthalten, die Datei muss von Hand angehängt werden). Passen
+die Notizen nicht in die URL (ca. 1800 Zeichen), steht im Mailtext ein Hinweis auf die Datei.
 
 ## Ordnerstruktur
 

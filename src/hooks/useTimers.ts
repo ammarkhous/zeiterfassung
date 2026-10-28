@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getDB } from '@/lib/db';
-import { TimerState } from '@/types';
+import { TimeEntry, TimerState } from '@/types';
 import { useTimeEntries } from './useTimeEntries';
 
 const localDateString = (d: Date): string => {
@@ -135,10 +135,11 @@ export const useTimers = () => {
   );
 
   const saveSession = useCallback(
-    async (key: string, duration_minutes: number, notes: string) => {
+    // Returns the saved entry so the caller can continue with it (signatures).
+    async (key: string, duration_minutes: number, notes: string): Promise<TimeEntry | null> => {
       const timer = timersRef.current.find((t) => t.key === key);
-      if (!timer) return;
-      await addEntry({
+      if (!timer) return null;
+      const entry = await addEntry({
         customer_id: timer.customer_id,
         session_type_id: timer.session_type_id,
         duration_minutes,
@@ -148,6 +149,7 @@ export const useTimers = () => {
         ended_at: new Date().toISOString(),
       });
       await remove(key);
+      return entry;
     },
     [addEntry, remove]
   );

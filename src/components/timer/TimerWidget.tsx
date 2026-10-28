@@ -4,8 +4,13 @@ import { useState } from 'react';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useSessionTypes } from '@/hooks/useSessionTypes';
 import { useTimers } from '@/hooks/useTimers';
+import { useTimeEntries } from '@/hooks/useTimeEntries';
+import { useProfile } from '@/hooks/useProfile';
 import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
+import { useToast } from '@/components/ui/Toast';
+import { SignatureModal, CapturedSignatures } from '@/components/signature/SignatureModal';
+import { TimeEntry } from '@/types';
 import { TimerCard } from './TimerCard';
 
 const darkFieldClass =
@@ -16,9 +21,15 @@ export const TimerWidget = () => {
   const { sessionTypes } = useSessionTypes();
   const { timers, startTimer, pauseTimer, resumeTimer, stopTimer, saveSession, discardSession } =
     useTimers();
+  const { updateEntry } = useTimeEntries();
+  const { username, email } = useProfile();
+  const { showToast } = useToast();
 
   const [customerId, setCustomerId] = useState('');
   const [sessionTypeId, setSessionTypeId] = useState('');
+  // The just-saved session waiting for its (optional) signatures. Lives here, not
+  // in TimerCard, because the card unmounts as soon as its timer is saved.
+  const [signingEntry, setSigningEntry] = useState<TimeEntry | null>(null);
 
   const customerName = (id: string) => customers.find((c) => c.id === id)?.name ?? '...';
   const sessionTypeLabel = (id: string) => sessionTypes.find((s) => s.id === id)?.label ?? '...';
@@ -28,6 +39,24 @@ export const TimerWidget = () => {
     await startTimer(customerId, sessionTypeId);
     // Keep the customer selected: a second session for the same customer is common.
     setSessionTypeId('');
+  };
+
+  const handleSave = async (key: string, minutes: number, notes: string) => {
+    const entry = await saveSession(key, minutes, notes);
+    if (entry) setSigningEntry(entry);
+  };
+
+  const handleSignaturesDone = async (signatures: CapturedSignatures | null) => {
+    const entry = signingEntry;
+    setSigningEntry(null);
+    // Everything skipped: the session is already saved as it is.
+    if (!entry || !signatures) return;
+    await updateEntry(entry.id, {
+      technician_signature: signatures.technician,
+      customer_signature: signatures.customer,
+      signed_at: new Date().toISOString(),
+    });
+    showToast('Unterschriften gespeichert', 'success');
   };
 
   const hasTimers = timers.length > 0;
@@ -43,7 +72,7 @@ export const TimerWidget = () => {
           onPause={() => pauseTimer(timer.key)}
           onResume={() => resumeTimer(timer.key)}
           onStop={() => stopTimer(timer.key)}
-          onSave={(minutes, notes) => saveSession(timer.key, minutes, notes)}
+          onSave={(minutes, notes) => handleSave(timer.key, minutes, notes)}
           onDiscard={() => discardSession(timer.key)}
         />
       ))}
@@ -99,6 +128,17 @@ export const TimerWidget = () => {
           ▶ Timer starten
         </Button>
       </div>
+
+      {signingEntry && (
+        <SignatureModal
+          key={signingEntry.id}
+          entry={signingEntry}
+          customerName={customerName(signingEntry.customer_id)}
+          sessionTypeLabel={sessionTypeLabel(signingEntry.session_type_id)}
+          technicianName={username ?? email ?? 'Techniker'}
+          onFinish={handleSignaturesDone}
+        />
+      )}
     </div>
   );
 };

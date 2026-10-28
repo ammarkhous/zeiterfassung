@@ -1,4 +1,4 @@
-import { MonthlyReportRow } from '@/types';
+import { MonthlyReportRow, TimeEntry } from '@/types';
 import { minutesToAE, minutesToHHMM } from '@/lib/ae';
 import { GERMAN_MONTHS } from '@/lib/germanMonths';
 
@@ -74,6 +74,31 @@ export const buildReportTxt = (
 
   return lines.join('\r\n') + '\r\n';
 };
+
+// Plain-text version of a single session with the complete, untouched notes
+// (original line breaks kept). Attached to the "per E-Mail senden" mail.
+export const buildSessionTxt = (
+  entry: TimeEntry,
+  customerName: string,
+  sessionTypeLabel: string
+): string => {
+  const lines = [
+    'ZEITERFASSUNG',
+    '',
+    `Kunde: ${customerName}`,
+    `Datum: ${formatDateDDMMYYYY(entry.entry_date)}`,
+    `Typ: ${sessionTypeLabel}`,
+    `Dauer: ${formatAEComma(entry.duration_minutes)} AE (${minutesToHHMM(entry.duration_minutes)})`,
+  ];
+  const notes = entry.notes?.trim();
+  if (notes) lines.push('', 'Notizen:', notes.replace(/\r?\n/g, '\r\n'));
+  return lines.join('\r\n') + '\r\n';
+};
+
+// File object for the Web Share API. Plain 'text/plain' (no charset parameter)
+// because canShare() only accepts bare MIME types; the BOM carries the encoding.
+export const createTextFile = (content: string, filename: string): File =>
+  new File(['﻿' + content], filename, { type: 'text/plain' });
 
 // Starts a browser download of a text file; the BOM makes Excel and Notepad
 // read it as UTF-8 (umlauts).

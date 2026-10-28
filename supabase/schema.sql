@@ -51,7 +51,17 @@ create table time_entries (
   started_at timestamptz,
   ended_at timestamptz,
   created_at timestamptz default now(),
-  updated_at timestamptz default now()
+  updated_at timestamptz default now(),
+  -- Optional finger signatures captured after a timer session (PNG data URLs, ~2-5 KB each).
+  technician_signature text,
+  customer_signature text,
+  signed_at timestamptz,
+  constraint time_entries_technician_signature_check
+    check (technician_signature is null
+      or (technician_signature like 'data:image/png;base64,%' and length(technician_signature) <= 100000)),
+  constraint time_entries_customer_signature_check
+    check (customer_signature is null
+      or (customer_signature like 'data:image/png;base64,%' and length(customer_signature) <= 100000))
 );
 
 create index time_entries_user_id_idx on time_entries (user_id);

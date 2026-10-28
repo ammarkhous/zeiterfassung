@@ -25,6 +25,7 @@ const RECHECK_MIN_INTERVAL_MS = 60_000;
 interface ProfileContextValue {
   role: UserRole | null;
   username: string | null;
+  email: string | null;
   isAdmin: boolean;
   loading: boolean;
 }
@@ -53,7 +54,13 @@ export const ProfileProvider = ({ userId, children }: { userId: string; children
   const [profile, setProfile] = useState<Profile | null>(null);
   const [cachedRole] = useState<UserRole | null>(() => readCachedRole(userId));
   const [fetched, setFetched] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
   const lastCheckAt = useRef(0);
+
+  // Read from the locally stored session, so this also works offline.
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setEmail(data.session?.user.email ?? null));
+  }, []);
 
   const forceSignOut = useCallback(
     async (notice: string) => {
@@ -118,11 +125,12 @@ export const ProfileProvider = ({ userId, children }: { userId: string; children
     return {
       role,
       username: profile?.username ?? null,
+      email,
       isAdmin: role === 'admin',
       // Until the first answer arrives (or while offline with no cache) the role is unknown.
       loading: !fetched && cachedRole === null,
     };
-  }, [profile, cachedRole, fetched]);
+  }, [profile, cachedRole, fetched, email]);
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;
 };
