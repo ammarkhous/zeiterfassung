@@ -9,6 +9,7 @@
 create table customers (
   id uuid primary key default gen_random_uuid(),
   name text not null,
+  address text check (address is null or char_length(address) <= 300),  -- postal address, up to 4 lines
   ae_rate numeric(10,2) not null default 0,
   active boolean default true,
   created_at timestamptz default now(),

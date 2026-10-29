@@ -1,6 +1,8 @@
 export interface Customer {
   id: string;
   name: string;
+  /** Postal address, up to 4 lines (street, postcode and city); printed on Word reports. */
+  address?: string | null;
   ae_rate: number;
   active: boolean;
   created_at: string;

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { getDB } from '@/lib/db';
+import { normalizeAddress } from '@/lib/address';
 import { writeWithSync, DATA_CHANGED_EVENT } from '@/lib/sync';
 import { Customer } from '@/types';
 
@@ -24,11 +25,12 @@ export const useCustomers = () => {
   }, [reload]);
 
   const addCustomer = useCallback(
-    async (name: string, ae_rate: number) => {
+    async (name: string, ae_rate: number, address?: string) => {
       const now = new Date().toISOString();
       const customer: Customer = {
         id: crypto.randomUUID(),
         name,
+        address: normalizeAddress(address),
         ae_rate,
         active: true,
         created_at: now,
@@ -42,13 +44,14 @@ export const useCustomers = () => {
   );
 
   const updateCustomer = useCallback(
-    async (id: string, changes: Partial<Pick<Customer, 'name' | 'ae_rate' | 'active'>>) => {
+    async (id: string, changes: Partial<Pick<Customer, 'name' | 'ae_rate' | 'active' | 'address'>>) => {
       const db = await getDB();
       const existing = await db.get('customers', id);
       if (!existing) return;
       const updated: Customer = {
         ...existing,
         ...changes,
+        ...('address' in changes ? { address: normalizeAddress(changes.address) } : {}),
         updated_at: new Date().toISOString(),
       };
       await writeWithSync('customers', 'update', updated as unknown as Record<string, unknown>);

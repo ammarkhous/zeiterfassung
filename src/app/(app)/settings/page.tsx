@@ -12,6 +12,23 @@ import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { IconButton } from '@/components/ui/IconButton';
 import { PeopleIcon, TagIcon, PencilIcon, PowerIcon, TrashIcon } from '@/components/nav/icons';
+import { MAX_ADDRESS_CHARS, MAX_ADDRESS_LINES, addressOneLine } from '@/lib/address';
+
+// Postal address of a customer: street on the first line, postcode and city on the next.
+const AddressField = ({ value, onChange }: { value: string; onChange: (value: string) => void }) => (
+  <label className="flex min-w-[14rem] flex-1 flex-col gap-1 text-sm text-text-muted">
+    Adresse (optional, für den Technikerbericht)
+    <textarea
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      rows={2}
+      maxLength={MAX_ADDRESS_CHARS}
+      placeholder={'Musterstraße 1\n01234 Musterstadt'}
+      title={`Höchstens ${MAX_ADDRESS_LINES} Zeilen`}
+      className="w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-base text-text outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+    />
+  </label>
+);
 
 export default function SettingsPage() {
   const { customers, addCustomer, updateCustomer, toggleActive, deleteCustomer } = useCustomers();
@@ -22,11 +39,13 @@ export default function SettingsPage() {
 
   const [newName, setNewName] = useState('');
   const [newRate, setNewRate] = useState('');
+  const [newAddress, setNewAddress] = useState('');
   const [newTypeLabel, setNewTypeLabel] = useState('');
 
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editRate, setEditRate] = useState('');
+  const [editAddress, setEditAddress] = useState('');
 
   const [editingTypeId, setEditingTypeId] = useState<string | null>(null);
   const [editTypeLabel, setEditTypeLabel] = useState('');
@@ -34,16 +53,18 @@ export default function SettingsPage() {
   const handleAddCustomer = async (e: FormEvent) => {
     e.preventDefault();
     if (!newName || !newRate) return;
-    await addCustomer(newName, parseFloat(newRate.replace(',', '.')));
+    await addCustomer(newName, parseFloat(newRate.replace(',', '.')), newAddress);
     setNewName('');
     setNewRate('');
+    setNewAddress('');
     showToast('Kunde hinzugefügt', 'success');
   };
 
-  const startEditCustomer = (id: string, name: string, rate: number) => {
+  const startEditCustomer = (id: string, name: string, rate: number, address?: string | null) => {
     setEditingCustomerId(id);
     setEditName(name);
     setEditRate(rate.toString());
+    setEditAddress(address ?? '');
   };
 
   const saveEditCustomer = async () => {
@@ -51,6 +72,7 @@ export default function SettingsPage() {
     await updateCustomer(editingCustomerId, {
       name: editName,
       ae_rate: parseFloat(editRate.replace(',', '.')),
+      address: editAddress,
     });
     setEditingCustomerId(null);
     showToast('Kunde aktualisiert', 'success');
@@ -132,6 +154,7 @@ export default function SettingsPage() {
             onChange={(e) => setNewRate(e.target.value)}
             required
           />
+          <AddressField value={newAddress} onChange={setNewAddress} />
           <Button type="submit">+ Kunde hinzufügen</Button>
         </form>
 
@@ -156,6 +179,7 @@ export default function SettingsPage() {
                     value={editRate}
                     onChange={(e) => setEditRate(e.target.value)}
                   />
+                  <AddressField value={editAddress} onChange={setEditAddress} />
                   <Button size="sm" onClick={saveEditCustomer}>
                     Speichern
                   </Button>
@@ -180,11 +204,16 @@ export default function SettingsPage() {
                     <p className="text-xs text-text-muted">
                       {c.ae_rate.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €/AE
                     </p>
+                    {c.address && (
+                      <p className="truncate text-xs text-text-muted" title={addressOneLine(c.address)}>
+                        {addressOneLine(c.address)}
+                      </p>
+                    )}
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
                     <IconButton
                       label="Bearbeiten"
-                      onClick={() => startEditCustomer(c.id, c.name, c.ae_rate)}
+                      onClick={() => startEditCustomer(c.id, c.name, c.ae_rate, c.address)}
                     >
                       <PencilIcon className="h-4 w-4" />
                     </IconButton>

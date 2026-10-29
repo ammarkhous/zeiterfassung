@@ -63,6 +63,8 @@ const para = (runs, o = {}) => {
     o.before !== undefined || o.after !== undefined
       ? `<w:spacing w:before="${o.before ?? 0}" w:after="${o.after ?? 0}"/>`
       : '',
+    // Hanging indent for list entries: the marker sits at left-hanging, the text at left.
+    o.indent ? `<w:ind w:left="${o.indent.left}" w:hanging="${o.indent.hanging}"/>` : '',
     o.align ? `<w:jc w:val="${o.align}"/>` : '',
   ].join('');
   const body = Array.isArray(runs) ? runs.join('') : runs;
@@ -82,8 +84,11 @@ const cell = (content, width, o = {}) => {
   return `<w:tc><w:tcPr><w:tcW w:w="${width}" w:type="dxa"/>${cellBorders(o.borders)}${shd}${margins}${o.vAlign ? `<w:vAlign w:val="${o.vAlign}"/>` : ''}</w:tcPr>${content}</w:tc>`;
 };
 
+// Rows stay on one page unless o.split is set. A row with long notes MUST be allowed to
+// split: a row taller than a page that cannot split runs into the footer in several
+// viewers (phone apps in particular).
 const row = (cells, o = {}) =>
-  `<w:tr><w:trPr><w:cantSplit/>${o.header ? '<w:tblHeader/>' : ''}</w:trPr>${cells.join('')}</w:tr>`;
+  `<w:tr><w:trPr>${o.split ? '' : '<w:cantSplit/>'}${o.header ? '<w:tblHeader/>' : ''}</w:trPr>${cells.join('')}</w:tr>`;
 
 // o.lines: 'invoice' = horizontal rules only; 'none' = invisible (layout tables).
 const table = (rows, widths, o = {}) => {
@@ -148,7 +153,8 @@ const styles =
   '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>' +
   '</w:styles>';
 
-// Top right, like the letterhead of a German invoice: logo, then the sender details.
+// Top right, like the letterhead of a German invoice: the logo. The sender details sit
+// below it in partiesBlock, level with the recipient.
 // This sits at the top of the document BODY, not in the page header: many viewers (phone
 // apps, previews, Drive) do not draw images from a header, so the logo went missing there.
 // The cost is that it appears on the first page only.
@@ -161,11 +167,8 @@ const letterhead =
       '<pic:blipFill><a:blip r:embed="rId4"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>' +
       `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${LOGO_W}" cy="${LOGO_H}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>` +
       '</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>',
-    { align: 'right', after: 60 }
-  ) +
-  para(run(COMPANY, { bold: true, color: NAVY, size: 18 }), { align: 'right' }) +
-  para(run(STREET, { color: MUTED, size: 17 }), { align: 'right' }) +
-  para(run(CITY, { color: MUTED, size: 17 }), { align: 'right', after: 360 });
+    { align: 'right', after: 120 }
+  );
 
 // Word takes a field's formatting from its own runs, so every part carries the same
 // small grey style as the surrounding "Seite ... von ..." text.
@@ -199,21 +202,34 @@ const documentXml = (bodyXml) =>
 
 // --- invoice building blocks -------------------------------------------------
 
-// Sender line above the recipient (small, underlined), the recipient, and on the right the
-// info block (number, date, ...) like Rechnungsnummer / Rechnungsdatum on an invoice.
-const addressAndInfo = (recipientTag, infoLines) => {
+// Recipient and sender side by side: the customer's name and address on the left, level
+// with our company name and address on the right (the logo sits above, right aligned).
+// The address only prints when the customer has one (IF in paragraphs of its own).
+const partiesBlock = (nameTag, addressTag) => {
   const left = 5300;
   const right = CW - left;
   const recipient = cell(
-    [
-      para(run(`${COMPANY} · ${STREET} · ${CITY}`, { color: MUTED, size: 14, underline: true }), { after: 120 }),
-      para(run(recipientTag, { bold: true, size: 22 })),
-      para(''),
-      para(''),
-    ].join(''),
+    para(run(nameTag, { bold: true, size: 18 }), { after: 20 }) +
+      para(run(`{IF ${addressTag}}`, { size: 2 })) +
+      para(run(`{${addressTag}}`, { size: 17 })) +
+      para(run('{END-IF}', { size: 2 })),
     left,
     { padL: 0, padV: 0 }
   );
+  const sender = cell(
+    para(run(COMPANY, { bold: true, color: NAVY, size: 18 }), { align: 'right', after: 20 }) +
+      para(run(STREET, { color: MUTED, size: 17 }), { align: 'right' }) +
+      para(run(CITY, { color: MUTED, size: 17 }), { align: 'right' }),
+    right,
+    { padR: 0, padV: 0 }
+  );
+  return table([row([recipient, sender])], [left, right], { lines: 'none' }) + spacer(200);
+};
+
+// Report number, date, ... on the right, like Rechnungsnummer / Rechnungsdatum on an invoice.
+const infoBlock = (infoLines) => {
+  const left = 5300;
+  const right = CW - left;
   const info = cell(
     infoLines
       .map(([label, tag]) => para([run(`${label} `, { bold: true, color: NAVY, size: 18 }), run(tag, { size: 18 })], { after: 40 }))
@@ -221,7 +237,30 @@ const addressAndInfo = (recipientTag, infoLines) => {
     right,
     { padL: 400, padV: 0 }
   );
-  return table([row([recipient, info])], [left, right], { lines: 'none' });
+  return table([row([cell(para(''), left, { padV: 0 }), info])], [left, right], { lines: 'none' });
+};
+
+// The note of a session, one paragraph per entry: headings, text, bullets and sub-points
+// (see src/lib/notes.ts). FOR/END-FOR and each IF/END-IF sit in paragraphs of their own,
+// which disappear from the output; the four IF blocks pick the layout of each entry.
+const noteLines = (v, path, o = {}) => {
+  const size = o.size ?? 20;
+  const color = o.color;
+  const ifBlock = (flag, inner) =>
+    para(run(`{IF $${v}.${flag}}`, { size: 2 })) + inner + para(run('{END-IF}', { size: 2 }));
+  const entry = (left) =>
+    para([run(`{$${v}.marker}`, { size, color }), '<w:r><w:tab/></w:r>', run(`{$${v}.text}`, { size, color })], {
+      indent: { left, hanging: 284 },
+      after: 40,
+    });
+  return (
+    para(run(`{FOR ${v} IN ${path}}`, { size: 2 })) +
+    ifBlock('ueberschrift', para(run(`{$${v}.text}`, { bold: true, color: NAVY, size }), { before: 100, after: 40, keepNext: true })) +
+    ifBlock('absatz', para(run(`{$${v}.text}`, { size, color }), { after: 60 })) +
+    ifBlock('punkt', entry(284)) +
+    ifBlock('unterpunkt', entry(568)) +
+    para(run(`{END-FOR ${v}}`, { size: 2 }))
+  );
 };
 
 const title = () =>
@@ -292,7 +331,7 @@ const monthlyBody = () => {
         cell(text('{$s.datum}'), POS[1]),
         cell(
           para(run('{$s.typ}', { size: 19, bold: true })) +
-            optionalLine('$s.notizen', para(run('{$s.notizen}', { size: 16, color: MUTED }))) +
+            noteLines('z', '$s.notizen_zeilen', { size: 16, color: MUTED }) +
             optionalLine(
               '$s.material',
               para([run('Material: ', { size: 16, bold: true, color: NAVY }), run('{$s.material}', { size: 16 })])
@@ -305,7 +344,7 @@ const monthlyBody = () => {
         ),
         cell(text('{$s.ae}', { align: 'right' }), POS[3]),
         cell(text('{$s.stunden}', { align: 'right' }), POS[4]),
-      ]),
+      ], { split: true }),
       helperRow('{END-FOR s}', POS),
     ],
     POS,
@@ -313,7 +352,8 @@ const monthlyBody = () => {
   );
 
   return [
-    addressAndInfo('{kunde.name}', [
+    partiesBlock('{kunde.name}', 'kunde.adresse'),
+    infoBlock([
       ['Technikerbericht-Nr.:', '{nummer}'],
       ['Datum:', '{erstellt_am}'],
       ['Zeitraum:', '{zeitraum}'],
@@ -435,7 +475,8 @@ const sessionBody = () => {
   );
 
   return [
-    addressAndInfo('{kunde}', [
+    partiesBlock('{kunde}', 'kunde_adresse'),
+    infoBlock([
       ['Technikerbericht-Nr.:', '{nummer}'],
       ['Datum:', '{datum}'],
       ['Techniker:', '{techniker}'],
@@ -451,7 +492,8 @@ const sessionBody = () => {
       keepNext: true,
       borderBottom: { size: 6, color: MAGENTA },
     }),
-    para(run('{notizen}', { size: 20 }), { after: 240 }),
+    noteLines('z', 'notizen_zeilen', { size: 20 }),
+    spacer(200),
     totals([['Gesamtdauer', '{dauer_ae} AE ({dauer_stunden})', true]]),
     para(run('Leistung bestätigt', { bold: true, color: NAVY, size: 21 }), { before: 360, after: 80, keepNext: true }),
     signatures,

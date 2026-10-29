@@ -3,6 +3,7 @@ import { minutesToAE, minutesToHHMM } from '@/lib/ae';
 import { GERMAN_MONTHS } from '@/lib/germanMonths';
 import { formatDateDDMMYYYY } from '@/lib/export';
 import { formatKm, formatMaterialLine, hasMaterials, hasTravel, sumKm } from '@/lib/materials';
+import { notesToPlain, notesToTemplateLines } from '@/lib/notes';
 
 // Everything a Word template can read. All values are ready-formatted strings (German
 // style, like the PDFs), so a template only places them. TEMPLATE_ROOTS is the
@@ -32,6 +33,7 @@ export const TEMPLATE_ROOTS: Record<ReportTemplateKind, readonly string[]> = {
   session: [
     'nummer',
     'kunde',
+    'kunde_adresse',
     'datum',
     'beginn',
     'ende',
@@ -45,6 +47,7 @@ export const TEMPLATE_ROOTS: Record<ReportTemplateKind, readonly string[]> = {
     'materialien',
     'techniker',
     'notizen',
+    'notizen_zeilen',
     'unterschrieben_am',
     'status_techniker',
     'status_kunde',
@@ -160,6 +163,7 @@ export const buildMonthlyTemplateData = (input: MonthlyTemplateInput) => {
 
   const kunden = rows.map((row) => ({
     name: row.customer.name,
+    adresse: row.customer.address ?? '',
     sessionen: String(row.entries.length),
     ae: formatAE(row.total_minutes),
     stunden: minutesToHHMM(row.total_minutes),
@@ -175,6 +179,8 @@ export const buildMonthlyTemplateData = (input: MonthlyTemplateInput) => {
       beginn: formatClock(e.started_at),
       ende: formatClock(e.ended_at),
       notizen: noteFor(e.notes),
+      // The same notes as one entry per paragraph (headings, text, bullets, sub-points).
+      notizen_zeilen: notesToTemplateLines(e.notes),
       // One material per line (the engine turns line breaks into Word line breaks).
       material: (e.materials ?? []).map(formatMaterialLine).join('\n'),
       fahrt: hasTravel(e) ? formatKm(e.travel_km as number) : '',
@@ -190,6 +196,7 @@ export const buildMonthlyTemplateData = (input: MonthlyTemplateInput) => {
       ? kunden[0]
       : {
           name: 'Alle Kunden',
+          adresse: '',
           sessionen: String(totalSessions),
           ae: formatAE(totalMinutes),
           stunden: minutesToHHMM(totalMinutes),
@@ -237,6 +244,7 @@ export const buildSessionTemplateData = (input: SessionTemplateInput) => {
   return {
     nummer: sessionNumber(entry),
     kunde: customer.name,
+    kunde_adresse: customer.address ?? '',
     datum: formatDateDDMMYYYY(entry.entry_date),
     beginn: formatClock(entry.started_at),
     ende: formatClock(entry.ended_at),
@@ -251,6 +259,7 @@ export const buildSessionTemplateData = (input: SessionTemplateInput) => {
     materialien: (entry.materials ?? []).map((item) => ({ name: item.name, menge: item.menge })),
     techniker: technicianName,
     notizen: noteText,
+    notizen_zeilen: notesToTemplateLines(entry.notes),
     unterschrieben_am: signedAt,
     status_techniker: status(!!entry.technician_signature),
     status_kunde: status(!!entry.customer_signature),
@@ -266,6 +275,7 @@ export const buildSessionTemplateData = (input: SessionTemplateInput) => {
 const sampleCustomer = (name: string, rate: number): Customer => ({
   id: name,
   name,
+  address: 'Musterstraße 1\n01234 Musterstadt',
   ae_rate: rate,
   active: true,
   created_at: '2026-01-01T00:00:00.000Z',
@@ -302,14 +312,15 @@ const sampleRow = (customer: Customer, entries: TimeEntry[]): MonthlyReportRow =
 // Complete data (no empty fields), so the upload dry-run can fail on a misspelled field.
 export const sampleTemplateData = (kind: ReportTemplateKind): Record<string, unknown> => {
   const label = () => 'Beratung';
-  const noteFor = (notes: string | null) => notes ?? '';
+  const noteFor = notesToPlain;
+  const sampleNotes = '1. Server migriert:\n- Backup geprüft\n* Zugänge eingerichtet\n  – Passwörter neu vergeben\nAbschluss mit dem Kunden besprochen.';
 
   if (kind === 'monthly') {
     const a = sampleCustomer('Beispiel GmbH', 80);
     const b = sampleCustomer('Muster AG', 65);
     return buildMonthlyTemplateData({
       rows: [
-        sampleRow(a, [sampleEntry('2026-10-05', 45, 'Beratung vor Ort'), sampleEntry('2026-10-12', 90, 'Server eingerichtet')]),
+        sampleRow(a, [sampleEntry('2026-10-05', 45, 'Beratung vor Ort'), sampleEntry('2026-10-12', 90, sampleNotes)]),
         sampleRow(b, [sampleEntry('2026-10-08', 30, 'Fernwartung')]),
       ],
       year: 2026,
@@ -322,10 +333,10 @@ export const sampleTemplateData = (kind: ReportTemplateKind): Record<string, unk
   }
 
   return buildSessionTemplateData({
-    entry: sampleEntry('2026-10-05', 45, 'Server migriert und Backup geprüft.\nZugänge eingerichtet.'),
+    entry: sampleEntry('2026-10-05', 45, sampleNotes),
     customer: sampleCustomer('Beispiel GmbH', 80),
     sessionTypeLabel: 'Beratung',
     technicianName: 'Max Mustermann',
-    noteText: 'Server migriert und Backup geprüft.\nZugänge eingerichtet.',
+    noteText: notesToPlain(sampleNotes),
   });
 };

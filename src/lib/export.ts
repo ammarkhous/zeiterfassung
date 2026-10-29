@@ -1,6 +1,7 @@
 import { MonthlyReportRow, TimeEntry } from '@/types';
 import { minutesToAE, minutesToHHMM } from '@/lib/ae';
 import { GERMAN_MONTHS } from '@/lib/germanMonths';
+import { notesToPlain } from '@/lib/notes';
 import {
   formatKm,
   formatMaterialLine,
@@ -34,8 +35,9 @@ export const sessionFileBaseName = (entry: TimeEntry, customerName: string): str
   return `Session_${safeFilePart(customerName)}_${entry.entry_date}${time}`;
 };
 
-// Notes are exported exactly as entered (they never leave the app for translation).
-export const noteText = (notes: string | null): string => notes ?? '';
+// Notes are tidied up (uniform bullets, no stray blank lines) but never rewritten, and
+// they never leave the app for translation.
+export const noteText = (notes: string | null): string => notesToPlain(notes);
 
 // Semicolon-separated (German Excel standard). A single session is just a report
 // with one row and one entry, so all CSV exports share this builder.

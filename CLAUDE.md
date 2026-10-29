@@ -190,6 +190,23 @@ unberührt). Der Entwurf wird wie die Notiz nicht über einen Reload gerettet.
   bekommen `fahrt`, `material`, `materialien`, `hat_fahrt`, `hat_material`, `km_gesamt`, `$k.km`, `$s.material`,
   `$s.fahrt` (siehe Admin-Tab).
 
+## Kundenadresse und Notizen in Berichten
+
+- **Kundenadresse:** `customers.address` (Text, bis 4 Zeilen / 300 Zeichen, optional), im Einstellungen-Tab beim Anlegen und
+  Bearbeiten eines Kunden (`src/lib/address.ts` bereinigt: Zeilen trimmen, Leerzeilen entfernen). Kunden sind geteilt, die Adresse
+  also auch. Sie erscheint nur im Word-Export (Vorlagenfelder `{kunde_adresse}` bzw. `{kunde.adresse}` / `{$k.adresse}`), nicht
+  in PDF/CSV/TXT. Im Kopf der mitgelieferten Vorlagen stehen Kundenname/-adresse links **auf einer Höhe** mit Firmenname/-adresse
+  rechts (Logo darüber); der Adressblock erscheint nur, wenn eine Adresse hinterlegt ist.
+- **Notizen werden geordnet:** `src/lib/notes.ts` erkennt, egal wie getippt, `-`, `*`, `+`, `•`, `–`, nummerierte Zeilen, eingerückte
+  Unterpunkte und `Label:`-Überschriften und macht daraus Überschrift / Text / Aufzählungspunkt / Unterpunkt (Leerzeilen, Tabs
+  und `**fett**` werden bereinigt). Plaintext-Exporte (PDF, CSV, TXT) bekommen einheitliche „•“-Punkte (`noteText` in
+  `src/lib/export.ts`); Word-Vorlagen bekommen zusätzlich `notizen_zeilen` (Schleife `{FOR z IN notizen_zeilen}` mit je einem
+  `{IF $z.ueberschrift}`, `{IF $z.absatz}`, `{IF $z.punkt}`, `{IF $z.unterpunkt}` und `{$z.text}` / `{$z.marker}`; Aufzählungspunkte
+  mit hängendem Einzug). Ältere hochgeladene Vorlagen mit `{notizen}` funktionieren weiter (einheitliche Punkte, aber ohne Einzug).
+  Neue Felder immer in `TEMPLATE_ROOTS` **und** den Buildern ergänzen.
+- **Tabellenzeilen dürfen umbrechen:** Die Zeile pro Session im Monatsbericht hat kein `cantSplit`. Eine unteilbare Zeile, die höher
+  als eine Seite ist, läuft in manchen Viewern (Handy-Apps) in die Fußzeile.
+
 ## Word-Vorlagen für Exporte
 
 Im Admin-Tab („Export-Vorlagen (Word)“) lädt der Administrator pro Berichtsart eine `.docx`-Vorlage hoch:
@@ -224,7 +241,7 @@ nicht in ein PDF umgewandelt werden (das bräuchte einen Server).
 - **Mitgelieferte Vorlagen:** `scripts/generate-sample-templates.js` erzeugt
   `public/templates/MCT_Vorlage_Monatsbericht.docx` und `MCT_Vorlage_Session-Bericht.docx` im Stil einer
   deutschen Rechnung („Technikerbericht“, Logo oben rechts, Absenderzeile, Infoblock, Positionstabelle,
-  Summen, Grußformel, Fußzeile mit Adresse). Logo: `scripts/assets/mct-logo.png`.
+  Summen, Grußformel, Fußzeile mit Adresse). Logo: `scripts/assets/mct-logo.png`, **im Dokumentkörper oben rechts** (nicht in der Kopfzeile, viele Viewer zeichnen Bilder aus Kopfzeilen nicht).
 
 ## Export & Versand
 
