@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/Toast';
 import { SignatureModal, CapturedSignatures } from '@/components/signature/SignatureModal';
 import { TimeEntry } from '@/types';
 import { TimerCard } from './TimerCard';
+import { FinishSessionModal } from './FinishSessionModal';
 
 const darkFieldClass =
   'border-white/15 bg-white/10 text-white placeholder:text-white/50 focus:border-accent-lime focus:ring-accent-lime';
@@ -60,24 +61,45 @@ export const TimerWidget = () => {
   };
 
   const hasTimers = timers.length > 0;
+  // Running or paused timers get cards; with more than one they shrink to slim rows.
+  // Stopped ones wait for their finish dialog, one at a time (and never on top of the
+  // signature dialog of the session saved just before).
+  const openTimers = timers.filter((t) => t.status !== 'stopped');
+  const stoppedTimers = timers.filter((t) => t.status === 'stopped');
+  const finishing = signingEntry ? undefined : stoppedTimers[0];
+  const compact = openTimers.length > 1;
 
   return (
-    <div className="flex flex-col gap-4">
-      {timers.map((timer) => (
+    <div className={['flex flex-col', compact ? 'gap-3' : 'gap-4'].join(' ')}>
+      {openTimers.map((timer) => (
         <TimerCard
           key={timer.key}
           timer={timer}
+          compact={compact}
           customerName={customerName(timer.customer_id)}
           sessionTypeLabel={sessionTypeLabel(timer.session_type_id)}
           onPause={() => pauseTimer(timer.key)}
           onResume={() => resumeTimer(timer.key)}
           onStop={() => stopTimer(timer.key)}
-          onSave={(minutes, notes, extras) => handleSave(timer.key, minutes, notes, extras)}
-          onDiscard={() => discardSession(timer.key)}
         />
       ))}
 
-      <div className="rounded-3xl bg-accent p-6 text-white">
+      {stoppedTimers
+        .filter((timer) => timer !== finishing)
+        .map((timer) => (
+          <div
+            key={timer.key}
+            className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3"
+          >
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-text">{customerName(timer.customer_id)}</p>
+              <p className="truncate text-xs text-text-muted">{sessionTypeLabel(timer.session_type_id)}</p>
+            </div>
+            <span className="shrink-0 text-xs font-semibold text-text-muted">Wartet auf Abschluss</span>
+          </div>
+        ))}
+
+      <div className={['rounded-3xl bg-accent text-white', hasTimers ? 'p-4' : 'p-6'].join(' ')}>
         <div className="mb-4 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-white/70">
           <span className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-accent-lime" />
@@ -89,7 +111,12 @@ export const TimerWidget = () => {
             00:00:00
           </div>
         )}
-        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div
+          className={
+            hasTimers ? 'grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto]' : 'flex flex-col gap-4'
+          }
+        >
+        <div className={hasTimers ? 'contents' : 'grid grid-cols-1 gap-3 sm:grid-cols-2'}>
           <Select
             value={customerId}
             onChange={(e) => setCustomerId(e.target.value)}
@@ -127,7 +154,19 @@ export const TimerWidget = () => {
         >
           ▶ Timer starten
         </Button>
+        </div>
       </div>
+
+      {finishing && (
+        <FinishSessionModal
+          key={finishing.key}
+          timer={finishing}
+          customerName={customerName(finishing.customer_id)}
+          sessionTypeLabel={sessionTypeLabel(finishing.session_type_id)}
+          onSave={(minutes, notes, extras) => handleSave(finishing.key, minutes, notes, extras)}
+          onDiscard={() => discardSession(finishing.key)}
+        />
+      )}
 
       {signingEntry && (
         <SignatureModal

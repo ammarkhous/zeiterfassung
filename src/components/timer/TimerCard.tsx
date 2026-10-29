@@ -1,12 +1,7 @@
 'use client';
 
-import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { useToast } from '@/components/ui/Toast';
-import { SessionExtras, TimerView } from '@/hooks/useTimers';
-import { DraftMaterial, MaterialFahrtFields } from '@/components/entry/MaterialFahrtFields';
-import { normalizeMaterials, parseKm } from '@/lib/materials';
-import { minutesToAE, minutesToHHMM } from '@/lib/ae';
+import { TimerView } from '@/hooks/useTimers';
 
 const formatHHMMSS = (totalSeconds: number): string => {
   const h = Math.floor(totalSeconds / 3600);
@@ -19,116 +14,111 @@ interface TimerCardProps {
   timer: TimerView;
   customerName: string;
   sessionTypeLabel: string;
+  /** Slim row instead of the big ring: used as soon as more than one timer is open. */
+  compact?: boolean;
   onPause: () => void | Promise<void>;
   onResume: () => void | Promise<void>;
   onStop: () => void | Promise<unknown>;
-  onSave: (minutes: number, notes: string, extras: SessionExtras) => Promise<void>;
-  onDiscard: () => Promise<void>;
 }
 
+// A running or paused timer. Stopped timers are finished in FinishSessionModal.
 export const TimerCard = ({
   timer,
   customerName,
   sessionTypeLabel,
+  compact = false,
   onPause,
   onResume,
   onStop,
-  onSave,
-  onDiscard,
 }: TimerCardProps) => {
-  const { showToast } = useToast();
-  const [notes, setNotes] = useState('');
-  const [saving, setSaving] = useState(false);
-  // Optional on-site extras; like the note, only kept while this card is open.
-  const [materials, setMaterials] = useState<DraftMaterial[]>([]);
-  const [kmText, setKmText] = useState('');
-  const [kmError, setKmError] = useState<string | undefined>();
-
   const isRunning = timer.status === 'running';
   const isPaused = timer.status === 'paused';
-  const isStopped = timer.status === 'stopped';
   const elapsedSeconds = timer.elapsedSeconds;
 
-  const handleSave = async () => {
-    const km = parseKm(kmText);
-    if (!km.ok) {
-      setKmError(km.error);
-      return;
-    }
-    setKmError(undefined);
+  const secondsInMinute = elapsedSeconds % 60;
+  const ringProgress = secondsInMinute / 60;
+  const ringJustWrapped = secondsInMinute === 0;
 
-    setSaving(true);
-    await onSave(timer.frozen_minutes ?? 1, notes, {
-      materials: normalizeMaterials(materials),
-      travel_km: km.km,
-    });
-    setSaving(false);
-    showToast('Session gespeichert', 'success');
-  };
-
-  const handleDiscard = async () => {
-    await onDiscard();
-    showToast('Session verworfen');
-  };
-
-  if (isStopped) {
-    const frozenMinutes = timer.frozen_minutes ?? 1;
+  if (compact) {
     return (
-      <div className="rounded-3xl border border-border bg-surface p-6">
-        <p
-          className="mb-1 truncate text-xs font-semibold uppercase tracking-wide text-text-muted"
-          title={`${customerName} · ${sessionTypeLabel}`}
-        >
-          {customerName} · {sessionTypeLabel}
-        </p>
-        <p className="mb-3 text-sm text-text">
-          Dauer: <span className="font-bold">{minutesToHHMM(frozenMinutes)}</span> ={' '}
-          <span className="font-bold">{minutesToAE(frozenMinutes).toFixed(1)} AE</span>
-        </p>
-        <div className="mb-4">
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Notizen / Beschreibung (optional, erscheint auf der Abrechnung)..."
-            rows={3}
-            className="w-full rounded-xl border border-border bg-surface-2 px-4 py-2.5 text-base text-text outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-          />
+      <div className="timer-pop-in relative overflow-hidden rounded-2xl bg-accent px-4 pb-4 pt-3 text-white">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+          <div className="min-w-0 flex-1 basis-44">
+            <p className="mb-0.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-white/70">
+              <span className="relative inline-flex h-2 w-2 shrink-0">
+                {isRunning && (
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-lime opacity-75" />
+                )}
+                <span
+                  className={[
+                    'relative inline-block h-2 w-2 rounded-full',
+                    isRunning ? 'bg-accent-lime' : 'pulse-dot bg-warning',
+                  ].join(' ')}
+                />
+              </span>
+              {isPaused ? 'Pausiert' : 'Läuft'}
+            </p>
+            <p className="truncate text-base font-semibold" title={customerName}>
+              {customerName}
+            </p>
+            <p className="truncate text-xs text-white/70" title={sessionTypeLabel}>
+              {sessionTypeLabel}
+            </p>
+          </div>
+          <div
+            className={[
+              'font-mono text-3xl font-bold tabular-nums',
+              isRunning ? 'text-white' : 'text-white/70',
+            ].join(' ')}
+          >
+            {formatHHMMSS(elapsedSeconds)}
+          </div>
+          <div className="flex w-full gap-2 sm:w-auto">
+            {isRunning ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                className="flex-1 border-white/15 bg-white/10 text-white hover:bg-white/20 sm:flex-none"
+                onClick={() => onPause()}
+              >
+                Pausieren
+              </Button>
+            ) : (
+              <Button size="sm" variant="lime" className="flex-1 sm:flex-none" onClick={() => onResume()}>
+                Fortsetzen
+              </Button>
+            )}
+            <Button size="sm" variant="danger" className="flex-1 sm:flex-none" onClick={() => onStop()}>
+              Stoppen
+            </Button>
+          </div>
         </div>
-        <MaterialFahrtFields
-          materials={materials}
-          onMaterialsChange={setMaterials}
-          kmText={kmText}
-          onKmTextChange={(text) => {
-            setKmText(text);
-            setKmError(undefined);
-          }}
-          kmError={kmError}
-          disabled={saving}
-        />
-        <div className="flex gap-2">
-          <Button onClick={handleSave} disabled={saving}>
-            Speichern
-          </Button>
-          <Button variant="secondary" onClick={handleDiscard} disabled={saving}>
-            Verwerfen
-          </Button>
+        {/* The minute ring of the big card, as a thin line along the bottom edge. */}
+        <div className="absolute inset-x-0 bottom-0 h-1 bg-white/15">
+          <div
+            className="h-full bg-accent-lime"
+            style={{
+              width: `${ringProgress * 100}%`,
+              transition: ringJustWrapped ? 'none' : 'width 1s linear',
+              boxShadow: isRunning ? '0 0 8px var(--accent-lime)' : 'none',
+            }}
+          />
         </div>
       </div>
     );
   }
 
-  const secondsInMinute = elapsedSeconds % 60;
-  const ringProgress = secondsInMinute / 60;
   const ringRadius = 46;
   const ringCircumference = 2 * Math.PI * ringRadius;
   const ringOffset = ringCircumference * (1 - ringProgress);
-  const ringJustWrapped = secondsInMinute === 0;
   const cometAngle = ringProgress * 2 * Math.PI;
   const cometX = 50 + ringRadius * Math.cos(cometAngle);
   const cometY = 50 + ringRadius * Math.sin(cometAngle);
 
+  // Phone: status, ring, buttons stacked. From sm up: the ring on the left, status, names
+  // and buttons stacked on its right, which halves the height of the card.
   return (
-    <div className="timer-pop-in relative overflow-hidden rounded-3xl bg-accent p-6 text-white">
+    <div className="timer-pop-in relative overflow-hidden rounded-3xl bg-accent p-5 text-white sm:px-8">
       {isRunning && (
         <>
           <div className="liquid-blob liquid-blob-lime -left-16 -top-16 h-72 w-72" />
@@ -136,32 +126,40 @@ export const TimerCard = ({
           <div className="liquid-blob liquid-blob-magenta left-1/3 top-1/2 h-56 w-56" />
         </>
       )}
-      <div className="relative z-10">
-        <div className="mb-6 flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white/70">
-          <span className="relative inline-flex h-2 w-2 shrink-0">
-            {isRunning && (
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-lime opacity-75" />
-            )}
-            <span
-              className={[
-                'relative inline-block h-2 w-2 rounded-full',
-                isRunning ? 'bg-accent-lime' : 'pulse-dot bg-warning',
-              ].join(' ')}
-            />
-          </span>
-          <span className="truncate" title={`${customerName} · ${sessionTypeLabel}`}>
-            {isPaused ? 'Pausiert' : 'Läuft'} · {customerName} · {sessionTypeLabel}
-          </span>
-          {isRunning && (
-            <span className="ml-1 flex h-3 shrink-0 items-end gap-[2px]" aria-hidden>
-              <span className="eq-bar h-full w-[2px] rounded-full bg-accent-lime" style={{ animationDelay: '0s' }} />
-              <span className="eq-bar h-full w-[2px] rounded-full bg-[#38d9e8]" style={{ animationDelay: '0.15s' }} />
-              <span className="eq-bar h-full w-[2px] rounded-full bg-accent-lime" style={{ animationDelay: '0.3s' }} />
-              <span className="eq-bar h-full w-[2px] rounded-full bg-[#38d9e8]" style={{ animationDelay: '0.45s' }} />
+      <div className="relative z-10 grid grid-cols-1 gap-4 sm:grid-cols-[auto_1fr] sm:grid-rows-[1fr_auto] sm:gap-x-8 sm:gap-y-5">
+        <div className="min-w-0 sm:col-start-2 sm:row-start-1 sm:self-end">
+          <div className="flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white/70">
+            <span className="relative inline-flex h-2 w-2 shrink-0">
+              {isRunning && (
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-lime opacity-75" />
+              )}
+              <span
+                className={[
+                  'relative inline-block h-2 w-2 rounded-full',
+                  isRunning ? 'bg-accent-lime' : 'pulse-dot bg-warning',
+                ].join(' ')}
+              />
             </span>
-          )}
+            <span className="truncate">{isPaused ? 'Pausiert' : 'Läuft'}</span>
+            {isRunning && (
+              <span className="ml-1 flex h-3 shrink-0 items-end gap-[2px]" aria-hidden>
+                <span className="eq-bar h-full w-[2px] rounded-full bg-accent-lime" style={{ animationDelay: '0s' }} />
+                <span className="eq-bar h-full w-[2px] rounded-full bg-[#38d9e8]" style={{ animationDelay: '0.15s' }} />
+                <span className="eq-bar h-full w-[2px] rounded-full bg-accent-lime" style={{ animationDelay: '0.3s' }} />
+                <span className="eq-bar h-full w-[2px] rounded-full bg-[#38d9e8]" style={{ animationDelay: '0.45s' }} />
+              </span>
+            )}
+          </div>
+          <p className="mt-1 truncate text-xl font-bold sm:text-2xl" title={customerName}>
+            {customerName}
+          </p>
+          <p className="truncate text-sm text-white/70" title={sessionTypeLabel}>
+            {sessionTypeLabel}
+          </p>
+          <p className="mt-2 hidden text-sm text-white/60 sm:block">Jede Minute zählt.</p>
         </div>
-        <div className="timer-digit-in relative mx-auto mb-6 flex h-60 w-60 items-center justify-center sm:h-72 sm:w-72">
+
+        <div className="timer-digit-in relative mx-auto flex h-44 w-44 items-center justify-center sm:col-start-1 sm:row-span-2 sm:row-start-1 sm:h-52 sm:w-52">
           {isRunning && <span key={`shock-${elapsedSeconds}`} className="shockwave-ring" aria-hidden />}
           <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full -rotate-90">
             <circle cx="50" cy="50" r={ringRadius} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="3" />
@@ -193,15 +191,15 @@ export const TimerCard = ({
           <div
             key={isRunning ? `digits-${elapsedSeconds}` : 'digits-static'}
             className={[
-              'relative z-10 text-center font-mono text-4xl font-bold tabular-nums sm:text-5xl',
+              'relative z-10 text-center font-mono text-3xl font-bold tabular-nums',
               isRunning ? 'neon-digits glitch-jolt text-white' : 'text-white/70',
             ].join(' ')}
           >
             {formatHHMMSS(elapsedSeconds)}
           </div>
         </div>
-        <p className="mb-6 text-center text-sm text-white/60">Jede Minute zählt.</p>
-        <div className="flex gap-2">
+
+        <div className="flex gap-2 sm:col-start-2 sm:row-start-2 sm:self-start">
           {isRunning ? (
             <Button
               variant="secondary"
